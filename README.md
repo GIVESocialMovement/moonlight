@@ -1,6 +1,9 @@
 Moonlight
 ==========
 
+[![CircleCI](https://circleci.com/gh/GIVESocialMovement/moonlight/tree/master.svg?style=shield)](https://circleci.com/gh/GIVESocialMovement/moonlight/tree/master)
+[![codecov](https://codecov.io/gh/GIVESocialMovement/moonlight/branch/master/graph/badge.svg)](https://codecov.io/gh/GIVESocialMovement/moonlight)
+
 Moonlight is a simple delayed job (or, in other words, background job) framework for Playframework on Heroku.
 
 Here are important notes:
