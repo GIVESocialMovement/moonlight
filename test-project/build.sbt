@@ -21,6 +21,6 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-slick" % "3.0.3",
   "com.typesafe.play" %% "play-slick-evolutions" % "3.0.3",
   "org.postgresql" % "postgresql" % "42.2.4",
-  "givers.moonlight" %% "play-moonlight" % "0.1.0",
+  "givers.moonlight" %% "play-moonlight" % "0.1.1" changing(),
 )
 
