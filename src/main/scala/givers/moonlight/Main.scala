@@ -41,14 +41,28 @@ object Main {
   }
 }
 
-class Main @Inject()(
+class Main(
   app: Application,
   moonlight: Moonlight,
   backgroundJobService: BackgroundJobService,
-  sleep: Long => Unit = Thread.sleep
+  sleep: Long => Unit
 )(
   implicit ec: ExecutionContext
 ) {
+
+  @Inject
+  def this(
+    app: Application,
+    moonlight: Moonlight,
+    backgroundJobService: BackgroundJobService,
+  )(
+    implicit ec: ExecutionContext
+  ) = this(
+    app = app,
+    moonlight = moonlight,
+    backgroundJobService = backgroundJobService,
+    sleep = Thread.sleep
+  )
 
   private[this] val DEFAULT_FUTURE_TIMEOUT = Duration.apply(5, TimeUnit.MINUTES)
 
