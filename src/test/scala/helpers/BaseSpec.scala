@@ -2,6 +2,9 @@ package helpers
 
 import java.util.concurrent.TimeUnit
 
+import org.mockito.ArgumentMatcher
+import org.mockito.internal.progress.ThreadSafeMockingProgress
+import org.mockito.verification.VerificationMode
 import play.api.db.evolutions.DefaultEvolutionsApi
 import play.api.db.slick.evolutions.SlickDBApi
 import play.api.db.slick.{DatabaseConfigProvider, DbName, SlickApi}
@@ -9,13 +12,14 @@ import slick.basic.{BasicProfile, DatabaseConfig}
 import slick.jdbc.PostgresProfile.api._
 import utest.TestSuite
 
-import scala.concurrent.{Await, Future}
+import scala.collection.mutable
 import scala.concurrent.duration.Duration
+import scala.concurrent.{Await, Future}
+import scala.reflect.ClassTag
 
 object BaseSpec {
 
   def await[T](future: Future[T]): T = {
-    import scala.concurrent.ExecutionContext.Implicits.global
     Await.result(future, Duration(10, TimeUnit.SECONDS))
   }
 
@@ -79,20 +83,27 @@ abstract class BaseSpec extends TestSuite {
 
   implicit val ec = scala.concurrent.ExecutionContext.Implicits.global
 
+  def mock[T](implicit m: ClassTag[T]): T = org.mockito.Mockito.mock(m.runtimeClass.asInstanceOf[Class[T]])
 
-  override def utestBeforeEach(path: Seq[String]): Unit = {
-    await(
-      BaseSpec.db.run {
-        sql"SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename ASC;".as[String]
-      }.flatMap { tables =>
-        Future.sequence(
-          tables.toList
-            .filterNot(_ == "play_evolutions")
-            .map { table =>
-              BaseSpec.db.run { sqlu"TRUNCATE #$table RESTART IDENTITY;" }
-            }
-        )
-      }
-    )
+  def any[T]() = org.mockito.ArgumentMatchers.any[T]()
+  def argThat[T](fn: T => Boolean) = org.mockito.ArgumentMatchers.argThat[T](new ArgumentMatcher[T] {
+    override def matches(argument: T) = fn(argument)
+  })
+  def varArgsThat[T](fn: Seq[T] => Boolean): T = {
+    ThreadSafeMockingProgress.mockingProgress().getArgumentMatcherStorage.reportMatcher(new ArgumentMatcher[mutable.WrappedArray[T]] {
+      override def matches(argument: mutable.WrappedArray[T]) = fn(argument)
+    })
+    null.asInstanceOf[T]
   }
+
+  def times(n: Int) = org.mockito.Mockito.times(n)
+
+  def eq[T](v: T) = org.mockito.ArgumentMatchers.eq(v)
+
+  def verify[T](mock: T) = org.mockito.Mockito.verify(mock)
+  def verify[T](mock: T, mode: VerificationMode) = org.mockito.Mockito.verify(mock, mode)
+  def verifyNoMoreInteractions(mocks: AnyRef*) = org.mockito.Mockito.verifyNoMoreInteractions(mocks:_*)
+  def verifyZeroInteractions(mocks: AnyRef*) = org.mockito.Mockito.verifyZeroInteractions(mocks:_*)
+  def when[T](methodCall: T) = org.mockito.Mockito.when(methodCall)
+  def doThrow(toBeThrown: Throwable*) = org.mockito.Mockito.doThrow(toBeThrown:_*)
 }
