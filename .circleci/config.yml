@@ -1,0 +1,42 @@
+version: 2
+jobs:
+  build:
+    docker:
+      - image: circleci/openjdk:8-jdk-node
+      - image: circleci/postgres:9.4
+        environment:
+          POSTGRES_USER: moonlight_test_user
+          POSTGRES_DB: moonlight_test
+          POSTGRES_PASSWORD: "test"
+    working_directory: ~/repo
+    environment:
+      JVM_OPTS: -Xmx3200m
+      TERM: dumb
+    steps:
+      - checkout
+      - restore_cache:
+          keys:
+          - dependencies-v1-{{ checksum "project/plugins.sbt" }}-{{ checksum "build.sbt" }}
+          - dependencies-v1-{{ checksum "project/plugins.sbt" }}
+          - dependencies-v1
+      - restore_cache:
+          keys:
+          - target-v1-{{ .Branch }}
+          - target-v1
+      - run: sbt coverage test coverageReport
+      - run: bash <(curl -s https://codecov.io/bash) -Z
+      - run: mkdir -p ./target/junit && cp -R ./target/test-reports ./target/junit/test-reports
+      - save_cache:
+          paths:
+            - target
+          key: target-v1-{{ .Branch }}
+      - save_cache:
+          paths:
+            - ~/.m2
+            - ~/.ivy2/cache
+            - ~/.sbt
+          key: dependencies-v1-{{ checksum "project/plugins.sbt" }}-{{ checksum "build.sbt" }}
+      - store_artifacts:
+          path: /tmp/screenshots
+      - store_test_results:
+          path: ./target/junit

@@ -8,7 +8,7 @@ import play.api._
 import play.api.inject.guice.GuiceApplicationBuilder
 
 import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext}
+import scala.concurrent.{Await, ExecutionContext, Future}
 
 
 class Moonlight(val workers: WorkerSpec*)
@@ -58,6 +58,7 @@ class Main @Inject()(
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run(): Unit = {
+        logger.info("Run the shutdown hook.")
         running.set(false)
       }
     })
@@ -85,25 +86,24 @@ class Main @Inject()(
 
   def runOneJob(running: AtomicBoolean): Unit = {
     try {
-      Await.ready(backgroundJobService.updateTimeoutJobs(), DEFAULT_FUTURE_TIMEOUT)
+      await(backgroundJobService.updateTimeoutJobs())
 
-      Await.result(backgroundJobService.get(), DEFAULT_FUTURE_TIMEOUT) match {
+      await(backgroundJobService.get()) match {
         case Some(job) =>
-          backgroundJobService.start(job.id, job.tryCount + 1)
+          await(backgroundJobService.start(job.id, job.tryCount + 1))
 
           val runnable = getWorker(job)
 
           try {
             logger.info(s"Started ${runnable.getClass.getSimpleName}")
             runnable.run(job)
-            backgroundJobService.succeed(job.id)
+            await(backgroundJobService.succeed(job.id))
             logger.info(s"Succeed ${runnable.getClass.getSimpleName}")
           } catch {
             case e: InterruptedException => throw e
             case e: Throwable =>
-              backgroundJobService.fail(job.id, e)
-              logger.error(s"Error occurred while running job (id=${job.id}, type=${job.jobType}, params=${job
-                .paramsInJsonString}.", e)
+              await(backgroundJobService.fail(job.id, e))
+              logger.error(s"Error occurred while running job (id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}.", e)
           }
         case None =>
           var count = 0
@@ -121,5 +121,9 @@ class Main @Inject()(
         logger.error("Error occurred while getting a background job.", e)
         running.set(false)
     }
+  }
+
+  private[this] def await[T](future: Future[T]): T = {
+    Await.result(future, DEFAULT_FUTURE_TIMEOUT)
   }
 }

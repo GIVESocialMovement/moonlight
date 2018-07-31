@@ -28,7 +28,6 @@ class BackgroundJobService @Inject()(
 
   val query = TableQuery[BackgroundJobTable]
 
-  private[this] val DEFAULT_TIMEOUT = Duration.apply(10, TimeUnit.SECONDS)
   private[this] val logger = Logger(this.getClass)
 
   def queue[T <: Job](
@@ -83,63 +82,66 @@ class BackgroundJobService @Inject()(
     }.map(_.headOption)
   }
 
+  def getById(id: Long): Future[Option[BackgroundJob]] = {
+    db
+      .run {
+        query.filter(_.id === id).take(1).result
+      }
+      .map(_.headOption)
+  }
+
   def updateTimeoutJobs(): Future[Unit] = {
     import BackgroundJob._
 
-    val threeHoursAgo = new Date(System.currentTimeMillis() - ONE_HOUR_IN_MILLIS)
+    val oneHoursAgo = new Date(System.currentTimeMillis() - ONE_HOUR_IN_MILLIS)
 
     db.run {
       query
         .filter { q =>
           q.status === BackgroundJob.Status.Started &&
-            q.startedAtOpt < threeHoursAgo
+            q.startedAtOpt < oneHoursAgo
         }
         .map { q => (q.status, q.error) }
         .update((BackgroundJob.Status.Failed, "Timeout"))
     }.map { _ => () }
   }
 
-  def start(id: Long, newTryCount: Int): Unit = {
+  def start(id: Long, newTryCount: Int): Future[Unit] = {
     import BackgroundJob._
 
-    Await.result(
-      awaitable = db.run {
+    db
+      .run {
         query
           .filter(_.id === id)
           .map { q =>
             (q.status, q.startedAtOpt, q.tryCount)
           }
           .update((BackgroundJob.Status.Started, Some(new Date()), newTryCount))
-      },
-      atMost = DEFAULT_TIMEOUT
-    )
-
-    ()
+      }
+      .map { _ => () }
   }
 
-  def succeed(id: Long): Unit = {
+  def succeed(id: Long): Future[Unit] = {
     import BackgroundJob._
 
-    Await.result(
-      awaitable = db.run {
+    db
+      .run {
         query
           .filter(_.id === id)
           .map { q =>
             (q.status, q.finishedAtOpt)
           }
           .update((BackgroundJob.Status.Succeeded, Some(new Date())))
-      },
-      atMost = DEFAULT_TIMEOUT
-    )
+      }
+      .map { _ => () }
 
-    ()
   }
 
-  def fail(id: Long, e: Throwable): Unit = {
+  def fail(id: Long, e: Throwable): Future[Unit] = {
     import BackgroundJob._
 
-    Await.result(
-      awaitable = db.run {
+    db
+      .run {
         query
           .filter(_.id === id)
           .map { q =>
@@ -150,10 +152,7 @@ class BackgroundJobService @Inject()(
             Some(new Date()),
             s"${e.getMessage}\n${e.getStackTrace.mkString("\n")}"
           ))
-      },
-      atMost = DEFAULT_TIMEOUT
-    )
-
-    ()
+      }
+      .map { _ => () }
   }
 }
