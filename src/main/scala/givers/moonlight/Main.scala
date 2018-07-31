@@ -44,7 +44,8 @@ object Main {
 class Main @Inject()(
   app: Application,
   moonlight: Moonlight,
-  backgroundJobService: BackgroundJobService
+  backgroundJobService: BackgroundJobService,
+  sleep: Long => Unit = Thread.sleep
 )(
   implicit ec: ExecutionContext
 ) {
@@ -70,17 +71,17 @@ class Main @Inject()(
     logger.info("Exit")
   }
 
-  def getWorker(job: BackgroundJob): Worker[_] = {
+  def getWorker(jobType: String): Worker[_] = {
     val applicableWorkers = moonlight.workers.filter { worker =>
-      worker.identifier == job.jobType || worker.previousIdentifiers.contains(job.jobType)
+      worker.identifier == jobType || worker.previousIdentifiers.contains(jobType)
     }.toList
 
     applicableWorkers match {
-      case Nil => throw new Exception(s"Unrecognized job type '${job.jobType}'.")
+      case Nil => throw new Exception(s"Unrecognized job type '$jobType'.")
       case one :: Nil => app.injector.instanceOf(one.classTag)
       case multiple =>
         val names = multiple.map(_.classTag.getClass.getCanonicalName).mkString(", ")
-        throw new Exception(s"Ambiguous job type '${job.jobType}'. Multiple workers ($names) are defined to process this job type.")
+        throw new Exception(s"Ambiguous job type '$jobType'. Multiple workers ($names) are defined to process this job type.")
     }
   }
 
@@ -92,7 +93,7 @@ class Main @Inject()(
         case Some(job) =>
           await(backgroundJobService.start(job.id, job.tryCount + 1))
 
-          val runnable = getWorker(job)
+          val runnable = getWorker(job.jobType)
 
           try {
             logger.info(s"Started ${runnable.getClass.getSimpleName}")
@@ -108,7 +109,7 @@ class Main @Inject()(
         case None =>
           var count = 0
           while (running.get() && count < 10) {
-            Thread.sleep(1000)
+            sleep(1000)
             count += 1
           }
       }

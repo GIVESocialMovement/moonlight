@@ -2,12 +2,32 @@ package givers.moonlight
 
 import java.util.Date
 
-import helpers.{BaseSpec, SimpleWorkerSpec}
+import helpers.{BaseSpec, SimpleWorker}
 import utest._
+
+import scala.concurrent.Future
 
 object BackgroundJobServiceSpec extends BaseSpec {
 
   val ONE_HOUR_IN_MILLIS = 3600L * 1000L
+
+  override def utestBeforeEach(path: Seq[String]): Unit = {
+    import slick.jdbc.PostgresProfile.api._
+
+    await(
+      BaseSpec.db.run {
+        sql"SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename ASC;".as[String]
+      }.flatMap { tables =>
+        Future.sequence(
+          tables.toList
+            .filterNot(_ == "play_evolutions")
+            .map { table =>
+              BaseSpec.db.run { sqlu"TRUNCATE #$table RESTART IDENTITY;" }
+            }
+        )
+      }
+    )
+  }
 
   val tests = Tests {
     val service = new BackgroundJobService(dbConfigProvider)
@@ -15,21 +35,24 @@ object BackgroundJobServiceSpec extends BaseSpec {
     "Queue a job and get" - {
       assert(await(service.get()).isEmpty)
 
-      val shouldRunAt = new Date(System.currentTimeMillis() - 10L)
-      val created = await(service.queue(shouldRunAt, SimpleWorkerSpec.Job("some work")))
+      val shouldRunAt = new Date(System.currentTimeMillis() - 1L)
+      val created = await(service.queue(shouldRunAt, SimpleWorker.Job("some work")))
+
+      val fetched = await(service.get())
+      val list = await(service.getAll(100))
       assert(
-        created.jobType == SimpleWorkerSpec.identifier,
+        created.jobType == SimpleWorker.identifier,
         created.status == BackgroundJob.Status.Pending,
         created.tryCount == 0,
         created.shouldRunAt == shouldRunAt,
         created.paramsInJsonString == """{"data":"some work"}""",
-        await(service.get()).contains(created),
-        await(service.getAll(100)) == Seq(created)
+        fetched.contains(created),
+        list == Seq(created)
       )
     }
 
     "Get a failed job after one hour" - {
-      val created = await(service.queue(new Date(System.currentTimeMillis() - 10L), SimpleWorkerSpec.Job("some work")))
+      val created = await(service.queue(new Date(System.currentTimeMillis() - 1000L), SimpleWorker.Job("some work")))
       await(service.fail(created.id, new Exception("Fake error")))
 
       assert(await(service.get()).isEmpty)
@@ -39,13 +62,13 @@ object BackgroundJobServiceSpec extends BaseSpec {
     }
 
     "Queue a job in the far future" - {
-      await(service.queue(new Date(System.currentTimeMillis() + 100000L), SimpleWorkerSpec.Job("some work")))
+      await(service.queue(new Date(System.currentTimeMillis() + 100000L), SimpleWorker.Job("some work")))
       assert(await(service.get()).isEmpty)
     }
 
     "Start" - {
-      val someOtherTask = await(service.queue(new Date(), SimpleWorkerSpec.Job("some work")))
-      val created = await(service.queue(new Date(), SimpleWorkerSpec.Job("some work")))
+      val someOtherTask = await(service.queue(new Date(), SimpleWorker.Job("some work")))
+      val created = await(service.queue(new Date(), SimpleWorker.Job("some work")))
 
       await(service.start(created.id, 12))
 
@@ -60,8 +83,8 @@ object BackgroundJobServiceSpec extends BaseSpec {
     }
 
     "Fail" - {
-      val someOtherTask = await(service.queue(new Date(), SimpleWorkerSpec.Job("some work")))
-      val created = await(service.queue(new Date(), SimpleWorkerSpec.Job("some work")))
+      val someOtherTask = await(service.queue(new Date(), SimpleWorker.Job("some work")))
+      val created = await(service.queue(new Date(), SimpleWorker.Job("some work")))
 
       await(service.start(created.id, 12))
       await(service.fail(created.id, new Exception("Fake error")))
@@ -75,8 +98,8 @@ object BackgroundJobServiceSpec extends BaseSpec {
     }
 
     "Succeed" - {
-      val someOtherTask = await(service.queue(new Date(), SimpleWorkerSpec.Job("some work")))
-      val created = await(service.queue(new Date(), SimpleWorkerSpec.Job("some work")))
+      val someOtherTask = await(service.queue(new Date(), SimpleWorker.Job("some work")))
+      val created = await(service.queue(new Date(), SimpleWorker.Job("some work")))
 
       await(service.start(created.id, 12))
       await(service.succeed(created.id))
@@ -90,9 +113,9 @@ object BackgroundJobServiceSpec extends BaseSpec {
     }
 
     "Update timeout jobs" - {
-      val timedOut = await(service.queue(new Date(), SimpleWorkerSpec.Job("some work")))
-      val notTimedOut = await(service.queue(new Date(), SimpleWorkerSpec.Job("some work")))
-      val notStarted = await(service.queue(new Date(), SimpleWorkerSpec.Job("some work")))
+      val timedOut = await(service.queue(new Date(), SimpleWorker.Job("some work")))
+      val notTimedOut = await(service.queue(new Date(), SimpleWorker.Job("some work")))
+      val notStarted = await(service.queue(new Date(), SimpleWorker.Job("some work")))
 
       await(service.start(timedOut.id, 1))
       await(service.start(notTimedOut.id, 1))
