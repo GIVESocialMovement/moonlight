@@ -41,35 +41,22 @@ object Main {
   }
 }
 
-class Main(
+class Main @Inject()(
   app: Application,
   moonlight: Moonlight,
   backgroundJobService: BackgroundJobService,
-  sleep: Long => Unit
 )(
   implicit ec: ExecutionContext
 ) {
 
-  @Inject
-  def this(
-    app: Application,
-    moonlight: Moonlight,
-    backgroundJobService: BackgroundJobService,
-  )(
-    implicit ec: ExecutionContext
-  ) = this(
-    app = app,
-    moonlight = moonlight,
-    backgroundJobService = backgroundJobService,
-    sleep = Thread.sleep
-  )
-
   private[this] val DEFAULT_FUTURE_TIMEOUT = Duration.apply(5, TimeUnit.MINUTES)
-
   private[this] val logger = Logger(this.getClass)
 
+  var sleep: Long => Unit = Thread.sleep
+  val running = new AtomicBoolean(true)
+
   def run(args: Array[String]): Unit = {
-    val running = new AtomicBoolean(true)
+    running.set(true)
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
       override def run(): Unit = {

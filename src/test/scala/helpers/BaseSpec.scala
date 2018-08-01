@@ -23,12 +23,14 @@ object BaseSpec {
     Await.result(future, Duration(10, TimeUnit.SECONDS))
   }
 
+  val DATABASE_URL = "postgres://moonlight_test_user:test@localhost:5432/postgres"
+
   val db = {
 
     Class.forName("org.postgresql.Driver") // load the driver
     val dummyDb = Database.forDataSource(
       ds = new slick.jdbc.DatabaseUrlDataSource {
-        url = "postgres://moonlight_test_user:test@localhost:5432/postgres"
+        url = DATABASE_URL
       },
       maxConnections = Some(1),
       executor = slick.util.AsyncExecutor("dummyDb", 1, 1, 1, 1)
@@ -77,6 +79,24 @@ abstract class BaseSpec extends TestSuite {
     new DatabaseConfigProvider {
       def get[P <: BasicProfile] = databaseConfig.asInstanceOf[DatabaseConfig[P]]
     }
+  }
+
+  def resetDatabase(): Unit = {
+    import slick.jdbc.PostgresProfile.api._
+
+    await(
+      BaseSpec.db.run {
+        sql"SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename ASC;".as[String]
+      }.flatMap { tables =>
+        Future.sequence(
+          tables.toList
+            .filterNot(_ == "play_evolutions")
+            .map { table =>
+              BaseSpec.db.run { sqlu"TRUNCATE #$table RESTART IDENTITY;" }
+            }
+        )
+      }
+    )
   }
 
   def await[T](future: Future[T]): T = BaseSpec.await(future)

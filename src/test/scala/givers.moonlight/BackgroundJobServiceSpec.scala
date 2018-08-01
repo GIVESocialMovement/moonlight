@@ -11,25 +11,8 @@ object BackgroundJobServiceSpec extends BaseSpec {
 
   val ONE_HOUR_IN_MILLIS = 3600L * 1000L
 
-  override def utestBeforeEach(path: Seq[String]): Unit = {
-    import slick.jdbc.PostgresProfile.api._
-
-    await(
-      BaseSpec.db.run {
-        sql"SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename ASC;".as[String]
-      }.flatMap { tables =>
-        Future.sequence(
-          tables.toList
-            .filterNot(_ == "play_evolutions")
-            .map { table =>
-              BaseSpec.db.run { sqlu"TRUNCATE #$table RESTART IDENTITY;" }
-            }
-        )
-      }
-    )
-  }
-
   val tests = Tests {
+    resetDatabase()
     val service = new BackgroundJobService(dbConfigProvider)
 
     "Queue a job and get" - {
