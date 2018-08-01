@@ -19,7 +19,8 @@ object MainSpec extends BaseSpec {
     val app = mock[Application]
     val moonlight = new Moonlight(SimpleWorker, AmbiguousWorker)
     val backgroundJobService = mock[BackgroundJobService]
-    val main = new Main(app, moonlight, backgroundJobService, { t => () })
+    val main = new Main(app, moonlight, backgroundJobService)
+    main.sleep = { _ => () }
     val worker = mock[SimpleWorker]
     val running = new AtomicBoolean(true)
 
