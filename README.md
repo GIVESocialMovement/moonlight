@@ -15,7 +15,7 @@ Here are important notes:
 At [GIVE.asia](https://give.asia), we've built Moonlight because we wanted a delayed job framework for moderate load.
 At the same time, we want to avoid introducing a new datastore to our system.
 
-Our setting is Playframework on Heroku with Postgresql, so Moonlight fits perfectly into our setting.
+We are using Playframework on Heroku with Postgresql (through Slick), so Moonlight fits perfectly into our setting.
 
 
 Usage
