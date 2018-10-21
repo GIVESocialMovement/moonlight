@@ -16,7 +16,7 @@ class Moonlight(val workers: WorkerSpec*)
 object Main {
   private[this] val logger = Logger(this.getClass)
 
-  def main(args: Array[String]): Unit = {
+  def main(args: Array[String]): Unit = try {
     val mode = args.head match {
       case "prod" => Mode.Prod
       case "dev" => Mode.Dev
@@ -26,18 +26,20 @@ object Main {
 
     logger.info(s"Start moonlight.Main ($mode)")
     val app = GuiceApplicationBuilder(environment = Environment.simple(mode = mode)).build()
+
     try {
       Play.start(app)
 
       app.injector.instanceOf[Main].run(realArgs)
-    } catch { case e: Throwable =>
-      logger.error("Error", e)
-      System.exit(1) // force terminating all hanging threads.
     } finally  {
       logger.info(s"Finished moonlight.Main ($mode)")
       Play.stop(app)
-      System.exit(0) // force terminating all hanging threads.
     }
+  } catch { case e: Throwable =>
+    logger.error("Error", e)
+    System.exit(1) // force terminating all hanging threads. This prevents a hang when there's an exception.
+  } finally {
+    System.exit(0) // force terminating all hanging threads.
   }
 }
 
