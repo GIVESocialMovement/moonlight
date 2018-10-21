@@ -38,7 +38,7 @@ Please apply the SQLs to your database.
 
 ```
 resolvers += Resolver.bintrayRepo("givers", "maven")
-libraryDependencies += "givers.moonlight" %% "play-moonlight" % "0.1.1"
+libraryDependencies += "givers.moonlight" %% "play-moonlight" % "0.1.2"
 ```
 
 ### 3. Create a worker
