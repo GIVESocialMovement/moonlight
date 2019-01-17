@@ -9,12 +9,12 @@ lazy val root = (project in file("."))
   .aggregate(moonlight)
   .dependsOn(moonlight)
 
-scalaVersion := "2.12.6"
+scalaVersion := "2.12.8"
 
 libraryDependencies ++= Seq(
   guice,
   "com.typesafe.play" %% "play-slick" % "3.0.3",
   "com.typesafe.play" %% "play-slick-evolutions" % "3.0.3",
-  "org.postgresql" % "postgresql" % "42.2.4"
+  "org.postgresql" % "postgresql" % "42.2.5"
 )
 
