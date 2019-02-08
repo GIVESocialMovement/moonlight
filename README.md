@@ -118,7 +118,7 @@ You can run Moonlight locally with `sbt 'runMain givers.moonlight.Main dev'`.
 On Heroku, you can run Moonlight by adding the below line to `Procfile`:
 
 ```
-worker: ./target/universal/stage/bin/[your_app_name] -Dconfig.resource=application.conf -main moonlight.Main -- prod
+worker: ./target/universal/stage/bin/[your_app_name] -Dconfig.resource=application.conf -main givers.moonlight.Main -- prod
 ```
 
 Please see a full example in the folder `test-project`.
