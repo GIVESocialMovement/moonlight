@@ -1,5 +1,6 @@
 package givers.moonlight
 
+import java.time.Instant
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -98,17 +99,21 @@ class Main @Inject()(
 
           val runnable = getWorker(job.jobType)
 
+          val startInMillis = Instant.now().toEpochMilli
           try {
-            logger.info(s"Started ${runnable.getClass.getSimpleName}")
+            logger.info(s"Started ${runnable.getClass.getSimpleName} (id=${job.id})")
             runnable.run(job)
             await(backgroundJobService.succeed(job.id))
-            logger.info(s"Succeed ${runnable.getClass.getSimpleName}")
+            logger.info(s"Finished ${runnable.getClass.getSimpleName} (id=${job.id}) successfully")
           } catch {
             case e: InterruptedException => throw e
             case e: Throwable =>
               await(backgroundJobService.fail(job.id, e))
-              logger.error(s"Error occurred while running job (id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}.", e)
+              logger.error(s"Error occurred while running ${runnable.getClass.getSimpleName} (id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}.", e)
+              logger.info(s"Finished ${runnable.getClass.getSimpleName} (id=${job.id}) with the above error")
           }
+          val duration = Instant.now().toEpochMilli - startInMillis
+          logger.info(s"The job (id=${job.id}) took $duration millis")
         case None =>
           var count = 0
           while (running.get() && count < 10) {
