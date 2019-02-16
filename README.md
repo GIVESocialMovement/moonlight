@@ -38,7 +38,7 @@ Please apply the SQLs to your database.
 
 ```
 resolvers += Resolver.bintrayRepo("givers", "maven")
-libraryDependencies += "givers.moonlight" %% "play-moonlight" % "0.2.0"
+libraryDependencies += "givers.moonlight" %% "play-moonlight" % "0.3.0"
 ```
 
 The artifacts are hosted here: https://bintray.com/givers/maven/play-moonlight
@@ -92,12 +92,18 @@ Create a module with defined `WorkerSpec`:
 ```
 package modules
 
-import givers.moonlight.Moonlight
+import givers.moonlight.{Config, Moonlight}
 import play.api.{Configuration, Environment}
 
 class MoonlightModule extends play.api.inject.Module {
   def bindings(environment: Environment, configuration: Configuration)  = Seq(
-    bind[Moonlight].toInstance(new Moonlight(SimpleWorkerSpec))
+    bind[Moonlight].toInstance(new Moonlight(
+      // When 3 errors occurs, Moonlight will exit. This is for avoiding being stuck in error repetitively.
+      // For example, in our case, on Heroku, when Moonlight runs on a bad machine, it will stop by itself and be
+      // started on a good machine.
+      config = Config(maxErrorCountToKillOpt = Some(3),
+      workers = Seq(SimpleWorkerSpec)
+    ))
   )
 }
 ```
