@@ -1,0 +1,13 @@
+<!-- https://www.playframework.com/documentation/latest/SettingsLogger -->
+<configuration>
+    <appender name="STDOUT" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%level %date{HH:mm:ss} %logger{15} - %message%n%xException{10}</pattern>
+        </encoder>
+    </appender>
+
+    <root level="INFO">
+        <appender-ref ref="STDOUT" />
+    </root>
+</configuration>
+

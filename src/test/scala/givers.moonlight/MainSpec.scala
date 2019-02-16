@@ -17,7 +17,8 @@ object MainSpec extends BaseSpec {
   val tests = Tests {
     val injector = mock[Injector]
     val app = mock[Application]
-    val moonlight = new Moonlight(SimpleWorker, AmbiguousWorker)
+    val config = Config(maxErrorCountToKillOpt = Some(10))
+    val moonlight = new Moonlight(config, Seq(SimpleWorker, AmbiguousWorker))
     val backgroundJobService = mock[BackgroundJobService]
     val main = new Main(app, moonlight, backgroundJobService)
     main.sleep = { _ => () }
@@ -103,6 +104,28 @@ object MainSpec extends BaseSpec {
         verify(backgroundJobService).get()
         verify(backgroundJobService).start(job.id, 1)
         verify(backgroundJobService).fail(eq(job.id), argThat { e: Throwable => e.getMessage == "FakeError" })
+        verifyNoMoreInteractions(backgroundJobService)
+      }
+
+      "Fail too many times" - {
+        when(worker.run(any())).thenAnswer(new Answer[Unit] {
+          override def answer(invocation: InvocationOnMock) = throw new Exception("FakeError")
+        })
+        when(backgroundJobService.get()).thenReturn(Future(Some(job)))
+
+        0.to(9).foreach { _ =>
+          main.runOneJob(running)
+        }
+        assert(running.get())
+
+        main.runOneJob(running)
+        assert(!running.get())
+
+        verify(worker, times(10)).run(job)
+        verify(backgroundJobService, times(10)).updateTimeoutJobs()
+        verify(backgroundJobService, times(10)).get()
+        verify(backgroundJobService, times(10)).start(job.id, 1)
+        verify(backgroundJobService, times(10)).fail(eq(job.id), argThat { e: Throwable => e.getMessage == "FakeError" })
         verifyNoMoreInteractions(backgroundJobService)
       }
 

@@ -25,5 +25,6 @@ class SimpleWorker @Inject()() extends Worker[SimpleWorkerSpec.Job] {
   def run(param: SimpleWorkerSpec.Job, job: BackgroundJob): Unit = {
     println(s"Process data: ${param.data}")
     Thread.sleep(10000)
+    throw new Exception("Fake error")
   }
 }

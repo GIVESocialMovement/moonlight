@@ -2,7 +2,7 @@ package givers.moonlight
 
 import java.time.Instant
 import java.util.concurrent.TimeUnit
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 
 import com.google.inject.Inject
 import play.api._
@@ -12,7 +12,11 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 
-class Moonlight(val workers: WorkerSpec*)
+case class Config(
+  maxErrorCountToKillOpt: Option[Int]
+)
+
+class Moonlight(val config: Config, val workers: Seq[WorkerSpec])
 
 object Main {
   private[this] val logger = Logger(this.getClass)
@@ -55,10 +59,12 @@ class Main @Inject()(
   private[this] val DEFAULT_FUTURE_TIMEOUT = Duration.apply(5, TimeUnit.MINUTES)
   private[this] val logger = Logger(this.getClass)
 
+  val errorCount = new AtomicInteger(0)
+
   var sleep: Long => Unit = Thread.sleep
   val running = new AtomicBoolean(true)
 
-  def run(args: Array[String]): Unit = {
+  def run(args: Array[String]): Unit = try {
     running.set(true)
 
     Runtime.getRuntime.addShutdownHook(new Thread() {
@@ -71,8 +77,12 @@ class Main @Inject()(
     while (running.get()) {
       runOneJob(running)
     }
-
+  } catch { case e: Throwable =>
+    logger.error("Error captured in Main.run(). Exit", e)
+    System.exit(1) // force terminating all hanging threads. This prevents a hang when there's an exception.
+  } finally {
     logger.info("Exit")
+    System.exit(0) // force terminating all hanging threads.
   }
 
   def getWorker(jobType: String): Worker[_] = {
@@ -108,6 +118,15 @@ class Main @Inject()(
           } catch {
             case e: InterruptedException => throw e
             case e: Throwable =>
+              errorCount.incrementAndGet()
+
+              moonlight.config.maxErrorCountToKillOpt.foreach { maxErrorCountToKill =>
+                if (maxErrorCountToKill <= errorCount.get) {
+                  logger.warn(s"Too many errors (maxErrorCountToKill = $maxErrorCountToKill, currentErrorCount = ${errorCount.get}). Exit")
+                  running.set(false)
+                }
+              }
+
               await(backgroundJobService.fail(job.id, e))
               logger.error(s"Error occurred while running ${runnable.getClass.getSimpleName} (id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}.", e)
               logger.info(s"Finished ${runnable.getClass.getSimpleName} (id=${job.id}) with the above error")
