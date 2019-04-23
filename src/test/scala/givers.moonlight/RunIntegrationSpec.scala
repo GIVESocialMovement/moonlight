@@ -35,8 +35,10 @@ object RunIntegrationSpec extends BaseSpec {
       val job = await(backgroundJobService.queue(new Date(), SimpleWorker.Job("some data")))
 
       Future {
-        while (!await(backgroundJobService.getById(job.id)).map(_.status).contains(BackgroundJob.Status.Succeeded)) {
+        var count = 0
+        while (!await(backgroundJobService.getById(job.id)).map(_.status).contains(BackgroundJob.Status.Succeeded) && count < 20) {
           Thread.sleep(100)
+          count += 1
         }
 
         run.running.set(false)

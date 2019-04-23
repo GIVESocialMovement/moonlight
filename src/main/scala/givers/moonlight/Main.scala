@@ -71,7 +71,7 @@ abstract class BaseCoordinate extends Main {
   def app: Application
   def moonlight: Moonlight
   def backgroundJobService: BackgroundJobService
-  def runJob(job: BackgroundJob): Unit
+  def runJob(jobId: Long): Unit
 
   private[this] val logger = Logger(this.getClass)
 
@@ -97,13 +97,14 @@ abstract class BaseCoordinate extends Main {
 
   def pickAndRunJob(running: AtomicBoolean): Unit = {
     try {
-      await(backgroundJobService.updateTimeoutJobs())
+      await(backgroundJobService.updateTimeoutStartedJobs())
+      await(backgroundJobService.updateTimeoutInitiatededJobs())
 
       await(backgroundJobService.get()) match {
         case Some(job) =>
           try {
-            await(backgroundJobService.start(job.id, job.tryCount + 1))
-            runJob(job)
+            await(backgroundJobService.initiate(job.id, job.tryCount + 1))
+            runJob(job.id)
           } catch {
             case e: InterruptedException => throw e
             case _: Throwable =>
@@ -145,8 +146,9 @@ class Coordinate @Inject()(
 ) extends BaseCoordinate {
   private[this] val logger = Logger(this.getClass)
 
-  def runJob(job: BackgroundJob): Unit = {
-    logger.info(s"Coordinate starts the job (id=${job.id})")
+  def runJob(jobId: Long): Unit = {
+    logger.info(s"Coordinate starts the job (id=${jobId})")
+    val job = await(backgroundJobService.getById(jobId)).get
     moonlight.startJobOpt.get.apply(job)
   }
 }
@@ -164,22 +166,24 @@ class Work @Inject()(
     val id = args.head.toLong
     assert(args.size == 1)
 
-    val job = await(backgroundJobService.getById(id)).getOrElse {
-      throw new Exception(s"The background job (id=$id) doesn't exist.")
-    }
 
-    if (job.status != Status.Started) {
-      throw new Exception(s"The background job's status isn't 'Started'; it is ${job.status}")
-    }
-
-    runJob(job)
+    runJob(id)
   }
 
-  def runJob(job: BackgroundJob): Unit = {
+  def runJob(jobId: Long): Unit = {
+    val job = await(backgroundJobService.getById(jobId)).getOrElse {
+      throw new Exception(s"The background job (id=$jobId) doesn't exist.")
+    }
+
     val runnable = getWorker(job.jobType)
 
     val startInMillis = Instant.now().toEpochMilli
     try {
+      if (job.status != Status.Initiated) {
+        throw new Exception(s"The background job's status isn't 'Initiated'; it is ${job.status}")
+      }
+
+      await(backgroundJobService.start(job.id))
       logger.info(s"Started ${runnable.getClass.getSimpleName} (id=${job.id})")
       runnable.run(job)
       await(backgroundJobService.succeed(job.id))
@@ -220,7 +224,7 @@ class Run @Inject()(
   implicit ec: ExecutionContext
 ) extends BaseCoordinate {
 
-  override def runJob(job: BackgroundJob): Unit = {
-    work.runJob(job)
+  override def runJob(jobId: Long): Unit = {
+    work.runJob(jobId)
   }
 }
