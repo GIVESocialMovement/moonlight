@@ -12,6 +12,7 @@
         <th>Param</th>
         <th>Status</th>
         <th>Scheduled to run at</th>
+        <th>Initiated at</th>
         <th>Started at</th>
         <th>Finished at</th>
       </tr>
@@ -23,6 +24,7 @@
           <td>@job.paramsInJsonString</td>
           <td>@job.status</td>
           <td>@job.shouldRunAt.toString()</td>
+          <td>@job.initiatedAtOpt.map(_.toString())</td>
           <td>@job.startedAtOpt.map(_.toString())</td>
           <td>@job.finishedAtOpt.map(_.toString())</td>
         </tr>

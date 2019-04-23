@@ -26,14 +26,17 @@ object RunSpec extends BaseSpec {
     val running = new AtomicBoolean(true)
 
     when(app.injector).thenReturn(injector)
-    when(backgroundJobService.updateTimeoutJobs()).thenReturn(Future(()))
-    when(backgroundJobService.start(any(), any())).thenReturn(Future(()))
+    when(backgroundJobService.updateTimeoutStartedJobs()).thenReturn(Future(()))
+    when(backgroundJobService.updateTimeoutInitiatededJobs()).thenReturn(Future(()))
+    when(backgroundJobService.start(any())).thenReturn(Future(()))
+    when(backgroundJobService.initiate(any(), any())).thenReturn(Future(()))
 
     "Pick and run one job" - {
       val job = BackgroundJob(
         id = 1L,
         createdAt = new Date(),
         shouldRunAt = new Date(),
+        initiatedAtOpt = None,
         startedAtOpt = None,
         finishedAtOpt = None,
         status = BackgroundJob.Status.Pending,
@@ -50,10 +53,11 @@ object RunSpec extends BaseSpec {
 
         assert(running.get())
 
-        verify(work).runJob(job)
-        verify(backgroundJobService).updateTimeoutJobs()
+        verify(work).runJob(job.id)
+        verify(backgroundJobService).updateTimeoutStartedJobs()
+        verify(backgroundJobService).updateTimeoutInitiatededJobs()
         verify(backgroundJobService).get()
-        verify(backgroundJobService).start(job.id, 1)
+        verify(backgroundJobService).initiate(job.id, 1)
         verifyNoMoreInteractions(backgroundJobService)
       }
 
@@ -68,10 +72,11 @@ object RunSpec extends BaseSpec {
         running.get() ==> true
         run.errorCount.get ==> 1
 
-        verify(work).runJob(job)
-        verify(backgroundJobService).updateTimeoutJobs()
+        verify(work).runJob(job.id)
+        verify(backgroundJobService).updateTimeoutStartedJobs()
+        verify(backgroundJobService).updateTimeoutInitiatededJobs()
         verify(backgroundJobService).get()
-        verify(backgroundJobService).start(job.id, 1)
+        verify(backgroundJobService).initiate(job.id, 1)
         verifyNoMoreInteractions(backgroundJobService)
       }
 
@@ -89,10 +94,11 @@ object RunSpec extends BaseSpec {
         run.pickAndRunJob(running)
         running.get() ==> false
 
-        verify(work, times(10)).runJob(job)
-        verify(backgroundJobService, times(10)).updateTimeoutJobs()
+        verify(work, times(10)).runJob(job.id)
+        verify(backgroundJobService, times(10)).updateTimeoutStartedJobs()
+        verify(backgroundJobService, times(10)).updateTimeoutInitiatededJobs()
         verify(backgroundJobService, times(10)).get()
-        verify(backgroundJobService, times(10)).start(job.id, 1)
+        verify(backgroundJobService, times(10)).initiate(job.id, 1)
         verifyNoMoreInteractions(backgroundJobService)
       }
 
@@ -103,7 +109,8 @@ object RunSpec extends BaseSpec {
 
         running.get() ==> true
 
-        verify(backgroundJobService).updateTimeoutJobs()
+        verify(backgroundJobService).updateTimeoutStartedJobs()
+        verify(backgroundJobService).updateTimeoutInitiatededJobs()
         verify(backgroundJobService).get()
         verifyNoMoreInteractions(backgroundJobService)
       }
@@ -118,10 +125,11 @@ object RunSpec extends BaseSpec {
 
         running.get() ==> false
 
-        verify(work).runJob(job)
-        verify(backgroundJobService).updateTimeoutJobs()
+        verify(work).runJob(job.id)
+        verify(backgroundJobService).updateTimeoutStartedJobs()
+        verify(backgroundJobService).updateTimeoutInitiatededJobs()
         verify(backgroundJobService).get()
-        verify(backgroundJobService).start(job.id, 1)
+        verify(backgroundJobService).initiate(job.id, 1)
         verifyNoMoreInteractions(backgroundJobService)
       }
 
@@ -132,7 +140,8 @@ object RunSpec extends BaseSpec {
 
         running.get() ==> false
 
-        verify(backgroundJobService).updateTimeoutJobs()
+        verify(backgroundJobService).updateTimeoutStartedJobs()
+        verify(backgroundJobService).updateTimeoutInitiatededJobs()
         verify(backgroundJobService).get()
         verifyNoMoreInteractions(backgroundJobService)
       }

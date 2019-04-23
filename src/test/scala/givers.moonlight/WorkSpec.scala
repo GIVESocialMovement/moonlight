@@ -23,8 +23,7 @@ object WorkSpec extends BaseSpec {
     val worker = mock[SimpleWorker]
 
     when(app.injector).thenReturn(injector)
-    when(backgroundJobService.updateTimeoutJobs()).thenReturn(Future(()))
-    when(backgroundJobService.start(any(), any())).thenReturn(Future(()))
+    when(backgroundJobService.start(any())).thenReturn(Future(()))
     when(backgroundJobService.succeed(any())).thenReturn(Future(()))
     when(backgroundJobService.fail(any(), any())).thenReturn(Future(()))
     when(injector.instanceOf[SimpleWorker]).thenReturn(worker)
@@ -62,19 +61,23 @@ object WorkSpec extends BaseSpec {
         id = 1L,
         createdAt = new Date(),
         shouldRunAt = new Date(),
+        initiatedAtOpt = None,
         startedAtOpt = None,
         finishedAtOpt = None,
-        status = BackgroundJob.Status.Pending,
+        status = BackgroundJob.Status.Initiated,
         error = "",
         tryCount = 0,
         jobType = "Simple",
         paramsInJsonString = """{"data": "something"}"""
       )
+      when(backgroundJobService.getById(any())).thenReturn(Future(Some(job)))
 
       "Get, run, and succeed" - {
-        work.runJob(job)
+        work.runJob(job.id)
 
         verify(worker).run(job)
+        verify(backgroundJobService).getById(job.id)
+        verify(backgroundJobService).start(job.id)
         verify(backgroundJobService).succeed(job.id)
         verifyNoMoreInteractions(backgroundJobService)
       }
@@ -85,10 +88,12 @@ object WorkSpec extends BaseSpec {
         })
 
         intercept[Exception] {
-          work.runJob(job)
+          work.runJob(job.id)
         }
 
         verify(worker).run(job)
+        verify(backgroundJobService).getById(job.id)
+        verify(backgroundJobService).start(job.id)
         verify(backgroundJobService).fail(eq(job.id), argThat { e: Throwable => e.getMessage == "FakeError" })
         verifyNoMoreInteractions(backgroundJobService)
       }
@@ -100,10 +105,12 @@ object WorkSpec extends BaseSpec {
         when(backgroundJobService.get()).thenReturn(Future(Some(job)))
 
         intercept[InterruptedException] {
-          work.runJob(job)
+          work.runJob(job.id)
         }
 
         verify(worker).run(job)
+        verify(backgroundJobService).getById(job.id)
+        verify(backgroundJobService).start(job.id)
         verifyNoMoreInteractions(backgroundJobService)
       }
     }

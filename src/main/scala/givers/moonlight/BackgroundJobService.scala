@@ -13,7 +13,8 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 object BackgroundJobService {
-  val ONE_HOUR_IN_MILLIS = 3600000L
+  val ONE_HOUR_IN_MILLIS = 60L * 60L * 1000L
+  val TEN_MINUTES_IN_MILLIS = 10L * 60L * 1000L
 }
 
 @Singleton
@@ -23,7 +24,6 @@ class BackgroundJobService @Inject()(
   implicit ec: ExecutionContext
 ) extends HasDatabaseConfigProvider[JdbcProfile] {
 
-  import BackgroundJobService._
   import dbConfig.profile.api._
 
   val query = TableQuery[BackgroundJobTable]
@@ -41,6 +41,7 @@ class BackgroundJobService @Inject()(
       id = -1,
       createdAt = new Date(),
       shouldRunAt = shouldRunAt,
+      initiatedAtOpt = None,
       startedAtOpt = None,
       finishedAtOpt = None,
       status = BackgroundJob.Status.Pending,
@@ -68,7 +69,8 @@ class BackgroundJobService @Inject()(
     import BackgroundJob._
 
     val now = new Date()
-    val oneHourAgo = new Date(now.getTime - ONE_HOUR_IN_MILLIS)
+    val oneHourInMillis = 60L * 60L * 1000L
+    val oneHourAgo = new Date(now.getTime - oneHourInMillis)
 
     db.run {
       query
@@ -90,23 +92,37 @@ class BackgroundJobService @Inject()(
       .map(_.headOption)
   }
 
-  def updateTimeoutJobs(): Future[Unit] = {
+  def updateTimeoutInitiatededJobs(): Future[Unit] = {
     import BackgroundJob._
 
-    val oneHoursAgo = new Date(System.currentTimeMillis() - ONE_HOUR_IN_MILLIS)
+    val upperBoundTime = new Date(System.currentTimeMillis() - BackgroundJobService.TEN_MINUTES_IN_MILLIS)
 
     db.run {
       query
         .filter { q =>
-          q.status === BackgroundJob.Status.Started &&
-            q.startedAtOpt < oneHoursAgo
+          q.status === BackgroundJob.Status.Initiated && q.initiatedAtOpt < upperBoundTime
         }
         .map { q => (q.status, q.error) }
         .update((BackgroundJob.Status.Failed, "Timeout"))
     }.map { _ => () }
   }
 
-  def start(id: Long, newTryCount: Int): Future[Unit] = {
+  def updateTimeoutStartedJobs(): Future[Unit] = {
+    import BackgroundJob._
+
+    val upperBoundTime = new Date(System.currentTimeMillis() - BackgroundJobService.ONE_HOUR_IN_MILLIS)
+
+    db.run {
+      query
+        .filter { q =>
+          q.status === BackgroundJob.Status.Started && q.startedAtOpt < upperBoundTime
+        }
+        .map { q => (q.status, q.error) }
+        .update((BackgroundJob.Status.Failed, "Timeout"))
+    }.map { _ => () }
+  }
+
+  def initiate(id: Long, newTryCount: Int): Future[Unit] = {
     import BackgroundJob._
 
     db
@@ -114,9 +130,24 @@ class BackgroundJobService @Inject()(
         query
           .filter(_.id === id)
           .map { q =>
-            (q.status, q.startedAtOpt, q.tryCount)
+            (q.status, q.initiatedAtOpt, q.tryCount)
           }
-          .update((BackgroundJob.Status.Started, Some(new Date()), newTryCount))
+          .update((BackgroundJob.Status.Initiated, Some(new Date()), newTryCount))
+      }
+      .map { _ => () }
+  }
+
+  def start(id: Long): Future[Unit] = {
+    import BackgroundJob._
+
+    db
+      .run {
+        query
+          .filter(_.id === id)
+          .map { q =>
+            (q.status, q.startedAtOpt)
+          }
+          .update((BackgroundJob.Status.Started, Some(new Date())))
       }
       .map { _ => () }
   }

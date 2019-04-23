@@ -7,7 +7,7 @@ import slick.jdbc.PostgresProfile.api._
 object BackgroundJob {
   object Status extends Enumeration {
     type Status = Value
-    val Pending, Started, Succeeded, Failed = Value
+    val Pending, Initiated, Started, Succeeded, Failed = Value
   }
 
   def statusToSqlType(status: Status.Value) = status.toString
@@ -21,6 +21,7 @@ case class BackgroundJob(
   id: Long,
   createdAt: Date,
   shouldRunAt: Date,
+  initiatedAtOpt: Option[Date],
   startedAtOpt: Option[Date],
   finishedAtOpt: Option[Date],
   status: BackgroundJob.Status.Value,
@@ -37,6 +38,7 @@ class BackgroundJobTable(tag: Tag) extends Table[BackgroundJob](tag, "background
   def id = column[Long]("id", O.PrimaryKey, O.AutoInc)
   def createdAt = column[Date]("created_at")
   def shouldRunAt = column[Date]("should_run_at")
+  def initiatedAtOpt = column[Option[Date]]("initiated_at_opt")
   def startedAtOpt = column[Option[Date]]("started_at_opt")
   def finishedAtOpt = column[Option[Date]]("finished_at_opt")
   def status = column[BackgroundJob.Status.Value]("status")
@@ -49,6 +51,7 @@ class BackgroundJobTable(tag: Tag) extends Table[BackgroundJob](tag, "background
     id,
     createdAt,
     shouldRunAt,
+    initiatedAtOpt,
     startedAtOpt,
     finishedAtOpt,
     status,

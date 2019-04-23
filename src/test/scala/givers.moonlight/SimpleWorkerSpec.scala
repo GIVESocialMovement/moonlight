@@ -12,6 +12,7 @@ object SimpleWorkerSpec extends BaseSpec {
       id = 1L,
       createdAt = new Date(),
       shouldRunAt = new Date(),
+      initiatedAtOpt = None,
       startedAtOpt = None,
       finishedAtOpt = None,
       status = BackgroundJob.Status.Pending,
