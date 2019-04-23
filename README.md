@@ -119,7 +119,7 @@ slick.dbs.default.db.properties.url="postgres://user:pass@localhost:5432/databas
 
 ### 5. Run Moonlight
 
-You can run Moonlight locally with `sbt 'runMain givers.moonlight.Main dev'`.
+You can run Moonlight locally with `sbt 'runMain givers.moonlight.Main dev run'`.
 
 On Heroku, you can run Moonlight by adding the below line to `Procfile`:
 

@@ -1,2 +1,2 @@
 web: ./target/universal/stage/bin/test-project -Dconfig.resource=heroku.conf
-worker: ./target/universal/stage/bin/test-project -Dconfig.resource=heroku.conf -main givers.moonlight.Main -- prod
+worker: ./target/universal/stage/bin/test-project -Dconfig.resource=heroku.conf -main givers.moonlight.Main -- prod coordinate
