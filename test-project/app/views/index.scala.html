@@ -7,7 +7,8 @@
     <table cellpadding="2" cellspacing="2" border="1">
       <tr>
         <th>Date</th>
-        <th>Job identifier</th>
+        <th>Job id</th>
+        <th>Job type</th>
         <th>Param</th>
         <th>Status</th>
         <th>Scheduled to run at</th>
@@ -17,6 +18,7 @@
       @jobs.map { job =>
         <tr>
           <td>@job.createdAt.toString()</td>
+          <td>@job.id</td>
           <td>@job.jobType</td>
           <td>@job.paramsInJsonString</td>
           <td>@job.status</td>

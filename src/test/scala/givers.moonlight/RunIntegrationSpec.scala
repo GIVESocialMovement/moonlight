@@ -10,7 +10,7 @@ import utest._
 
 import scala.concurrent.Future
 
-object MainIntegrationSpec extends BaseSpec {
+object RunIntegrationSpec extends BaseSpec {
 
   val tests = Tests {
     resetDatabase()
@@ -23,13 +23,13 @@ object MainIntegrationSpec extends BaseSpec {
       )))
       .bindings(new Module {
         override def bindings(environment: Environment, configuration: Configuration) = Seq(
-          bind[Moonlight].toInstance(new Moonlight(Config(maxErrorCountToKillOpt = None), Seq(SimpleWorker)))
+          bind[Moonlight].toInstance(new Moonlight(Config(maxErrorCountToKillOpt = None), Seq(SimpleWorker), None))
         )
       })
       .in(Mode.Test)
       .build()
     val backgroundJobService = app.injector.instanceOf[BackgroundJobService]
-    val main = app.injector.instanceOf[Main]
+    val run = app.injector.instanceOf[Run]
 
     "Queue and run" - {
       val job = await(backgroundJobService.queue(new Date(), SimpleWorker.Job("some data")))
@@ -39,10 +39,10 @@ object MainIntegrationSpec extends BaseSpec {
           Thread.sleep(100)
         }
 
-        main.running.set(false)
+        run.running.set(false)
       }
 
-      main.run(Array.empty)
+      run.run(Array.empty)
 
       val finishedOpt = await(backgroundJobService.getById(job.id))
       assert(finishedOpt.map(_.status).contains(BackgroundJob.Status.Succeeded))
