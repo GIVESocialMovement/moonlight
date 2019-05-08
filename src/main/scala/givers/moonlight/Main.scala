@@ -17,10 +17,12 @@ case class Config(
   maxErrorCountToKillOpt: Option[Int]
 )
 
+case class StartJobResult(started: Boolean)
+
 class Moonlight(
   val config: Config,
   val workers: Seq[WorkerSpec],
-  val startJobOpt: Option[BackgroundJob => Unit]
+  val startJobOpt: Option[BackgroundJob => StartJobResult]
 )
 
 object Main {
@@ -147,9 +149,14 @@ class Coordinate @Inject()(
   private[this] val logger = Logger(this.getClass)
 
   def runJob(jobId: Long): Unit = {
-    logger.info(s"Coordinate starts the job (id=${jobId})")
+    logger.info(s"Coordinate starts the job (id=$jobId)")
     val job = await(backgroundJobService.getById(jobId)).get
-    moonlight.startJobOpt.get.apply(job)
+    val result  = moonlight.startJobOpt.get.apply(job)
+
+    if (!result.started) {
+      logger.info(s"The job (id=$jobId) isn't started. Revert the status back to pending.")
+      await(backgroundJobService.uninitiate(jobId, job.tryCount - 1))
+    }
   }
 }
 

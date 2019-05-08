@@ -1,7 +1,7 @@
 package worker
 
 import com.google.inject.{Inject, Provider}
-import givers.moonlight.{Config, Moonlight}
+import givers.moonlight.{Config, Moonlight, StartJobResult}
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
 import play.api.{Configuration, Environment}
@@ -26,12 +26,13 @@ class MoonlightLocalProvider @Inject()(
       Config(maxErrorCountToKillOpt = Some(3)),
       Seq(SimpleWorkerSpec),
       Some({ job =>
-        Process(
-          Seq(
-            "sbt",
-            s"runMain givers.moonlight.Main dev work ${job.id}"
-          )
-        ).!
+//        Process(
+//          Seq(
+//            "sbt",
+//            s"runMain givers.moonlight.Main dev work ${job.id}"
+//          )
+//        ).!
+        StartJobResult(started = false)
       })
     )
   }
