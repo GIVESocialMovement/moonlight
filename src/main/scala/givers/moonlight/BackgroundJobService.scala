@@ -15,6 +15,7 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 object BackgroundJobService {
   val ONE_HOUR_IN_MILLIS = 60L * 60L * 1000L
   val TEN_MINUTES_IN_MILLIS = 10L * 60L * 1000L
+  val FIVE_MINUTES_IN_MILLIS = 5L * 60L * 1000L
 }
 
 @Singleton
@@ -133,6 +134,21 @@ class BackgroundJobService @Inject()(
             (q.status, q.initiatedAtOpt, q.tryCount)
           }
           .update((BackgroundJob.Status.Initiated, Some(new Date()), newTryCount))
+      }
+      .map { _ => () }
+  }
+
+  def uninitiate(id: Long, newTryCount: Int): Future[Unit] = {
+    import BackgroundJob._
+
+    db
+      .run {
+        query
+          .filter(_.id === id)
+          .map { q =>
+            (q.status, q.initiatedAtOpt, q.tryCount, q.shouldRunAt)
+          }
+          .update((BackgroundJob.Status.Pending, None, newTryCount, new Date(System.currentTimeMillis() + BackgroundJobService.FIVE_MINUTES_IN_MILLIS)))
       }
       .map { _ => () }
   }

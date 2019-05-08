@@ -1,7 +1,7 @@
 package worker
 
 import com.google.inject.{Inject, Provider}
-import givers.moonlight.{Config, Moonlight}
+import givers.moonlight.{Config, Moonlight, StartJobResult}
 import play.api.libs.json.Json
 import play.api.libs.ws.WSClient
 import play.api.{Configuration, Environment}
@@ -25,23 +25,28 @@ class MoonlightHerokuProvider @Inject()(
       Config(maxErrorCountToKillOpt = Some(3)),
       Seq(SimpleWorkerSpec),
       Some({ job =>
-        val result = await(ws
-          .url("https://api.heroku.com/apps/moonlight-test/dynos")
-          .withHttpHeaders(
-            "Accept" -> "application/vnd.heroku+json; version=3",
-            "Authorization" -> s"Bearer ${sys.env.apply("HEROKU_API_KEY")}",
-            "Content-Type" -> "application/json"
-          )
-          .post(Json.obj(
-            "attach" -> false,
-            "command" ->  s"./target/universal/stage/bin/test-project -Dconfig.resource=heroku.conf -main givers.moonlight.Main -- prod work ${job.id}",
-            "env" -> Json.obj(),
-            "size" ->  "free",
-            "type" -> "run",
-            "time_to_live" -> 1800
-          )))
-        println(result.status)
-        println(result.body)
+        try {
+          val result = await(ws
+            .url("https://api.heroku.com/apps/moonlight-test/dynos")
+            .withHttpHeaders(
+              "Accept" -> "application/vnd.heroku+json; version=3",
+              "Authorization" -> s"Bearer ${sys.env.apply("HEROKU_API_KEY")}",
+              "Content-Type" -> "application/json"
+            )
+            .post(Json.obj(
+              "attach" -> false,
+              "command" ->  s"./target/universal/stage/bin/test-project -Dconfig.resource=heroku.conf -main givers.moonlight.Main -- prod work ${job.id}",
+              "env" -> Json.obj(),
+              "size" ->  "free",
+              "type" -> "run",
+              "time_to_live" -> 1800
+            )))
+          println(result.status)
+          println(result.body)
+          StartJobResult(started = true)
+        } catch {
+          case e: Exception => StartJobResult(started = false)
+        }
       })
     )
   }

@@ -3,7 +3,7 @@
 # --- !Ups
 
 CREATE TABLE background_jobs (
-    id bigserial NOT NULL,
+    id bigserial NOT NULL PRIMARY KEY,
     created_at bigint NOT NULL,
     started_at_opt bigint,
     finished_at_opt bigint,
