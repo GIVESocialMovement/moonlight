@@ -5,8 +5,6 @@ import java.util.Date
 import helpers.{BaseSpec, SimpleWorker}
 import utest._
 
-import scala.concurrent.Future
-
 object BackgroundJobServiceSpec extends BaseSpec {
 
   val ONE_HOUR_IN_MILLIS = 3600L * 1000L
@@ -130,7 +128,7 @@ object BackgroundJobServiceSpec extends BaseSpec {
       updateStartedAtOpt(timedOut.id, Some(new Date(System.currentTimeMillis() - 2L * ONE_HOUR_IN_MILLIS)))  // 2 hours
       updateStartedAtOpt(notTimedOut.id, Some(new Date(System.currentTimeMillis() - (ONE_HOUR_IN_MILLIS / 2L))))  // 30 minutes
 
-      await(service.updateTimeoutStartedJobs())
+      await(service.updateTimeoutStartedJobs(ONE_HOUR_IN_MILLIS))
 
       val retrievedTimedOut = await(service.getById(timedOut.id)).get
       val retrievedNotTimedOut = await(service.getById(notTimedOut.id)).get
