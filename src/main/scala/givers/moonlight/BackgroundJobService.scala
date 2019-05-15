@@ -13,7 +13,6 @@ import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 
 object BackgroundJobService {
-  val ONE_HOUR_IN_MILLIS = 60L * 60L * 1000L
   val TEN_MINUTES_IN_MILLIS = 10L * 60L * 1000L
   val FIVE_MINUTES_IN_MILLIS = 5L * 60L * 1000L
 }
@@ -108,10 +107,10 @@ class BackgroundJobService @Inject()(
     }.map { _ => () }
   }
 
-  def updateTimeoutStartedJobs(): Future[Unit] = {
+  def updateTimeoutStartedJobs(timeoutInMillis: Long): Future[Unit] = {
     import BackgroundJob._
 
-    val upperBoundTime = new Date(System.currentTimeMillis() - BackgroundJobService.ONE_HOUR_IN_MILLIS)
+    val upperBoundTime = new Date(System.currentTimeMillis() - timeoutInMillis)
 
     db.run {
       query

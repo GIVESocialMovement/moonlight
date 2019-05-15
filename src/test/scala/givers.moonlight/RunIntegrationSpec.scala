@@ -23,7 +23,7 @@ object RunIntegrationSpec extends BaseSpec {
       )))
       .bindings(new Module {
         override def bindings(environment: Environment, configuration: Configuration) = Seq(
-          bind[Moonlight].toInstance(new Moonlight(Config(maxErrorCountToKillOpt = None), Seq(SimpleWorker), None))
+          bind[Moonlight].toInstance(new Moonlight(Config(maxErrorCountToKillOpt = None, timeoutInMillis = 60L * 60L * 1000L), Seq(SimpleWorker), None))
         )
       })
       .in(Mode.Test)
