@@ -18,23 +18,25 @@ object BackgroundJobServiceSpec extends BaseSpec {
       assert(await(service.get()).isEmpty)
 
       val shouldRunAt = new Date(System.currentTimeMillis() - 1L)
-      val created = await(service.queue(shouldRunAt, SimpleWorker.Job("some work")))
+      val low = await(service.queue(shouldRunAt, 1, SimpleWorker.Job("some work")))
+      val high = await(service.queue(shouldRunAt, 0, SimpleWorker.Job("some work")))
 
       val fetched = await(service.get())
       val list = await(service.getAll(100))
       assert(
-        created.jobType == SimpleWorker.identifier,
-        created.status == BackgroundJob.Status.Pending,
-        created.tryCount == 0,
-        created.shouldRunAt == shouldRunAt,
-        created.paramsInJsonString == """{"data":"some work"}""",
-        fetched.contains(created),
-        list == Seq(created)
+        high.jobType == SimpleWorker.identifier,
+        high.status == BackgroundJob.Status.Pending,
+        high.tryCount == 0,
+        high.priority == 0,
+        high.shouldRunAt == shouldRunAt,
+        high.paramsInJsonString == """{"data":"some work"}""",
+        fetched.contains(high),
+        list == Seq(high, low)
       )
     }
 
     "Get a failed job after one hour" - {
-      val created = await(service.queue(new Date(System.currentTimeMillis() - 1000L), SimpleWorker.Job("some work")))
+      val created = await(service.queue(new Date(System.currentTimeMillis() - 1000L), 0, SimpleWorker.Job("some work")))
       await(service.fail(created.id, new Exception("Fake error")))
 
       assert(await(service.get()).isEmpty)
@@ -44,13 +46,13 @@ object BackgroundJobServiceSpec extends BaseSpec {
     }
 
     "Queue a job in the far future" - {
-      await(service.queue(new Date(System.currentTimeMillis() + 100000L), SimpleWorker.Job("some work")))
+      await(service.queue(new Date(System.currentTimeMillis() + 100000L), 0, SimpleWorker.Job("some work")))
       assert(await(service.get()).isEmpty)
     }
 
     "Initiate" - {
-      val someOtherTask = await(service.queue(new Date(), SimpleWorker.Job("some work")))
-      val created = await(service.queue(new Date(), SimpleWorker.Job("some work")))
+      val someOtherTask = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
+      val created = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
 
       await(service.initiate(created.id, 12))
 
@@ -66,8 +68,8 @@ object BackgroundJobServiceSpec extends BaseSpec {
     }
 
     "Start" - {
-      val someOtherTask = await(service.queue(new Date(), SimpleWorker.Job("some work")))
-      val created = await(service.queue(new Date(), SimpleWorker.Job("some work")))
+      val someOtherTask = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
+      val created = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
 
       await(service.initiate(created.id, 12))
       await(service.start(created.id))
@@ -83,8 +85,8 @@ object BackgroundJobServiceSpec extends BaseSpec {
     }
 
     "Fail" - {
-      val someOtherTask = await(service.queue(new Date(), SimpleWorker.Job("some work")))
-      val created = await(service.queue(new Date(), SimpleWorker.Job("some work")))
+      val someOtherTask = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
+      val created = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
 
       await(service.initiate(created.id, 12))
       await(service.start(created.id))
@@ -99,8 +101,8 @@ object BackgroundJobServiceSpec extends BaseSpec {
     }
 
     "Succeed" - {
-      val someOtherTask = await(service.queue(new Date(), SimpleWorker.Job("some work")))
-      val created = await(service.queue(new Date(), SimpleWorker.Job("some work")))
+      val someOtherTask = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
+      val created = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
 
       await(service.initiate(created.id, 12))
       await(service.start(created.id))
@@ -115,9 +117,9 @@ object BackgroundJobServiceSpec extends BaseSpec {
     }
 
     "Update timeout started jobs" - {
-      val timedOut = await(service.queue(new Date(), SimpleWorker.Job("some work")))
-      val notTimedOut = await(service.queue(new Date(), SimpleWorker.Job("some work")))
-      val notStarted = await(service.queue(new Date(), SimpleWorker.Job("some work")))
+      val timedOut = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
+      val notTimedOut = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
+      val notStarted = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
 
       await(service.initiate(timedOut.id, 1))
       await(service.initiate(notTimedOut.id, 1))
@@ -142,9 +144,9 @@ object BackgroundJobServiceSpec extends BaseSpec {
     }
 
     "Update timeout initiated jobs" - {
-      val timedOut = await(service.queue(new Date(), SimpleWorker.Job("some work")))
-      val notTimedOut = await(service.queue(new Date(), SimpleWorker.Job("some work")))
-      val notInitiated = await(service.queue(new Date(), SimpleWorker.Job("some work")))
+      val timedOut = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
+      val notTimedOut = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
+      val notInitiated = await(service.queue(new Date(), 0, SimpleWorker.Job("some work")))
 
 
       await(service.initiate(timedOut.id, 1))

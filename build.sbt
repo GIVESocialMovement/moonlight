@@ -14,7 +14,7 @@ libraryDependencies ++= Seq(
 
 organization := "givers.moonlight"
 name := "play-moonlight"
-version := "0.7.0"
+version := "0.8.0"
 parallelExecution in Test := false
 
 publishMavenStyle := true

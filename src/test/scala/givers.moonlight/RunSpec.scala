@@ -43,7 +43,8 @@ object RunSpec extends BaseSpec {
         error = "",
         tryCount = 0,
         jobType = "Simple",
-        paramsInJsonString = """{"data": "something"}"""
+        paramsInJsonString = """{"data": "something"}""",
+        priority = 0
       )
 
       "Get, run, and succeed" - {

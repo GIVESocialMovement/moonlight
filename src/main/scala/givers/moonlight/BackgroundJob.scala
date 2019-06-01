@@ -11,10 +11,10 @@ object BackgroundJob {
   }
 
   def statusToSqlType(status: Status.Value) = status.toString
-  implicit val StatusColumnType = MappedColumnType.base[Status.Value, String](statusToSqlType, Status.withName)
+  implicit val StatusColumnType: BaseColumnType[Status.Value] = MappedColumnType.base[Status.Value, String](statusToSqlType, Status.withName)
 
   def dateToSqlType(date: Date) = date.getTime
-  implicit val DateColumnType = MappedColumnType.base[Date, Long](dateToSqlType, { t => new Date(t) })
+  implicit val DateColumnType: BaseColumnType[Date] = MappedColumnType.base[Date, Long](dateToSqlType, { t => new Date(t) })
 }
 
 case class BackgroundJob(
@@ -28,7 +28,8 @@ case class BackgroundJob(
   error: String,
   tryCount: Int,
   jobType: String,
-  paramsInJsonString: String
+  paramsInJsonString: String,
+  priority: Int
 )
 
 class BackgroundJobTable(tag: Tag) extends Table[BackgroundJob](tag, "background_jobs") {
@@ -46,6 +47,7 @@ class BackgroundJobTable(tag: Tag) extends Table[BackgroundJob](tag, "background
   def tryCount = column[Int]("try_count")
   def jobType = column[String]("job_type")
   def paramsInJsonString = column[String]("params_in_json_string")
+  def priority = column[Int]("priority")
 
   def * = (
     id,
@@ -58,6 +60,7 @@ class BackgroundJobTable(tag: Tag) extends Table[BackgroundJob](tag, "background
     error,
     tryCount,
     jobType,
-    paramsInJsonString
+    paramsInJsonString,
+    priority
   ) <> ((BackgroundJob.apply _).tupled, BackgroundJob.unapply)
 }

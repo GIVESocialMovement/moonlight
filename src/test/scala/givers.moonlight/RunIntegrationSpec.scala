@@ -32,7 +32,7 @@ object RunIntegrationSpec extends BaseSpec {
     val run = app.injector.instanceOf[Run]
 
     "Queue and run" - {
-      val job = await(backgroundJobService.queue(new Date(), SimpleWorker.Job("some data")))
+      val job = await(backgroundJobService.queue(new Date(), 0, SimpleWorker.Job("some data")))
 
       Future {
         var count = 0

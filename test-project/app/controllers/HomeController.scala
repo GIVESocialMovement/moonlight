@@ -23,11 +23,12 @@ class HomeController @Inject()(
     }
   }
 
-  case class AddParam(data: String)
+  case class AddParam(data: String, priority: Int)
 
   val addForm = Form(
     mapping(
-      "data" -> text
+      "data" -> text,
+      "priority" -> number
     )(AddParam.apply)(AddParam.unapply)
   )
 
@@ -37,9 +38,13 @@ class HomeController @Inject()(
         throw new Exception("Invalid form data: " + error)
       },
       success = { param =>
-        backgroundJobService.queue(new Date(System.currentTimeMillis() + 10000), SimpleWorkerSpec.Job(param.data)).map { _ =>
-          Redirect("/")
-        }
+        backgroundJobService
+          .queue(
+            shouldRunAt = new Date(System.currentTimeMillis() + 10000),
+            priority = param.priority,
+            param = SimpleWorkerSpec.Job(param.data)
+          )
+          .map { _ => Redirect("/") }
       }
     )
   }
