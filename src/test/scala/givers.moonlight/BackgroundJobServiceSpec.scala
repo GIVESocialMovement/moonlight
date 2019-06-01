@@ -137,9 +137,11 @@ object BackgroundJobServiceSpec extends BaseSpec {
       assert(
         await(service.getById(notStarted.id)).contains(notStarted),
         retrievedTimedOut.status == BackgroundJob.Status.Failed,
-        retrievedTimedOut.error == "Timeout",
+        retrievedTimedOut.error == "Timeout (from Started)",
+        retrievedTimedOut.finishedAtOpt.isDefined,
         retrievedNotTimedOut.status == BackgroundJob.Status.Started,
-        retrievedNotTimedOut.error == ""
+        retrievedNotTimedOut.error == "",
+        retrievedNotTimedOut.finishedAtOpt.isEmpty
       )
     }
 
@@ -162,9 +164,11 @@ object BackgroundJobServiceSpec extends BaseSpec {
       assert(
         await(service.getById(notInitiated.id)).contains(notInitiated),
         retrievedTimedOut.status == BackgroundJob.Status.Failed,
-        retrievedTimedOut.error == "Timeout",
+        retrievedTimedOut.error == "Timeout (from Initiated)",
+        retrievedTimedOut.finishedAtOpt.isDefined,
         retrievedNotTimedOut.status == BackgroundJob.Status.Initiated,
-        retrievedNotTimedOut.error == ""
+        retrievedNotTimedOut.error == "",
+        retrievedNotTimedOut.finishedAtOpt.isEmpty
       )
     }
   }
