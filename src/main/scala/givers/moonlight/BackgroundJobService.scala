@@ -104,8 +104,8 @@ class BackgroundJobService @Inject()(
         .filter { q =>
           q.status === BackgroundJob.Status.Initiated && q.initiatedAtOpt < upperBoundTime
         }
-        .map { q => (q.status, q.error) }
-        .update((BackgroundJob.Status.Failed, "Timeout"))
+        .map { q => (q.status, q.error, q.finishedAtOpt) }
+        .update((BackgroundJob.Status.Failed, "Timeout (from Initiated)", Some(new Date())))
     }.map { _ => () }
   }
 
@@ -119,8 +119,8 @@ class BackgroundJobService @Inject()(
         .filter { q =>
           q.status === BackgroundJob.Status.Started && q.startedAtOpt < upperBoundTime
         }
-        .map { q => (q.status, q.error) }
-        .update((BackgroundJob.Status.Failed, "Timeout"))
+        .map { q => (q.status, q.error, q.finishedAtOpt) }
+        .update((BackgroundJob.Status.Failed, "Timeout (from Started)", Some(new Date())))
     }.map { _ => () }
   }
 
