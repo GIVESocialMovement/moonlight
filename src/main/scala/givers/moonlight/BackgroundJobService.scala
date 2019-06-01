@@ -147,9 +147,9 @@ class BackgroundJobService @Inject()(
         query
           .filter(_.id === id)
           .map { q =>
-            (q.status, q.initiatedAtOpt, q.tryCount, q.shouldRunAt)
+            (q.status, q.initiatedAtOpt, q.tryCount)
           }
-          .update((BackgroundJob.Status.Pending, None, newTryCount, new Date(System.currentTimeMillis() + BackgroundJobService.FIVE_MINUTES_IN_MILLIS)))
+          .update((BackgroundJob.Status.Pending, None, newTryCount))
       }
       .map { _ => () }
   }
