@@ -32,7 +32,8 @@ class BackgroundJobService @Inject()(
 
   def queue[T <: Job](
     shouldRunAt: Date,
-    param: T
+    priority: Int,
+    param: T,
   )(
     implicit jsonFormat: OFormat[T],
     id: JobId[T]
@@ -48,7 +49,8 @@ class BackgroundJobService @Inject()(
       error = "",
       tryCount = 0,
       jobType = id.value,
-      paramsInJsonString = jsonFormat.writes(param).toString
+      paramsInJsonString = jsonFormat.writes(param).toString,
+      priority = priority
     )
 
     db.run {
@@ -61,7 +63,7 @@ class BackgroundJobService @Inject()(
   def getAll(limit: Int): Future[Seq[BackgroundJob]] = {
     import BackgroundJob._
     db.run {
-      query.sortBy(_.createdAt.desc).take(limit).result
+      query.sortBy(_.id.desc).take(limit).result
     }
   }
 
@@ -78,7 +80,7 @@ class BackgroundJobService @Inject()(
           (q.status === BackgroundJob.Status.Pending && q.shouldRunAt < now) ||
             (q.status === BackgroundJob.Status.Failed && q.tryCount < 3 && q.finishedAtOpt < oneHourAgo)
         }
-        .sortBy(_.createdAt.asc)
+        .sortBy { q => (q.priority.asc, q.createdAt.asc) }
         .take(1)
         .result
     }.map(_.headOption)

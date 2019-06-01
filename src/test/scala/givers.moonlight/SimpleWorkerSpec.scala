@@ -19,7 +19,8 @@ object SimpleWorkerSpec extends BaseSpec {
       error = "",
       tryCount = 0,
       jobType = "Simple",
-      paramsInJsonString = """{"data": "something"}"""
+      paramsInJsonString = """{"data": "something"}""",
+      priority = 0
     )
     val worker = new SimpleWorker
 
