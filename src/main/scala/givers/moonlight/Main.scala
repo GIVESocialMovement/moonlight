@@ -23,7 +23,8 @@ case class StartJobResult(started: Boolean)
 class Moonlight(
   val config: Config,
   val workers: Seq[WorkerSpec],
-  val startJobOpt: Option[BackgroundJob => StartJobResult]
+  val startJobOpt: Option[BackgroundJob => StartJobResult],
+  val canStartJobOpt: Option[() => Boolean]
 )
 
 object Main {
@@ -75,6 +76,7 @@ abstract class BaseCoordinate extends Main {
   def moonlight: Moonlight
   def backgroundJobService: BackgroundJobService
   def runJob(jobId: Long): Unit
+  def canStartJob(): Boolean
 
   private[this] val logger = Logger(this.getClass)
 
@@ -98,36 +100,46 @@ abstract class BaseCoordinate extends Main {
     }
   }
 
+  private[this] def run(running: AtomicBoolean): Boolean = {
+    if (!canStartJob()) { return false }
+
+    await(backgroundJobService.get()) match {
+      case Some(job) =>
+        try {
+          await(backgroundJobService.initiate(job.id, job.tryCount + 1))
+          runJob(job.id)
+        } catch {
+          case e: InterruptedException => throw e
+          case _: Throwable =>
+            errorCount.incrementAndGet()
+
+            moonlight.config.maxErrorCountToKillOpt.foreach { maxErrorCountToKill =>
+              if (maxErrorCountToKill <= errorCount.get) {
+                logger.warn(s"Too many errors (maxErrorCountToKill = $maxErrorCountToKill, currentErrorCount = ${errorCount.get}). Exit")
+                running.set(false)
+              }
+            }
+        }
+
+        true
+      case None => false
+    }
+  }
+
   def pickAndRunJob(running: AtomicBoolean): Unit = {
     try {
       await(backgroundJobService.updateTimeoutStartedJobs(moonlight.config.timeoutInMillis))
       await(backgroundJobService.updateTimeoutInitiatededJobs())
 
-      await(backgroundJobService.get()) match {
-        case Some(job) =>
-          try {
-            await(backgroundJobService.initiate(job.id, job.tryCount + 1))
-            runJob(job.id)
-          } catch {
-            case e: InterruptedException => throw e
-            case _: Throwable =>
-              errorCount.incrementAndGet()
+      val isRun = run(running)
 
-              moonlight.config.maxErrorCountToKillOpt.foreach { maxErrorCountToKill =>
-                if (maxErrorCountToKill <= errorCount.get) {
-                  logger.warn(s"Too many errors (maxErrorCountToKill = $maxErrorCountToKill, currentErrorCount = ${errorCount.get}). Exit")
-                  running.set(false)
-                }
-              }
-          }
-        case None =>
-          var count = 0
-          while (running.get() && count < 10) {
-            sleep(1000)
-            count += 1
-          }
+      if (!isRun) {
+        var count = 0
+        while (running.get() && count < 10) {
+          sleep(1000)
+          count += 1
+        }
       }
-
     } catch {
       case _: InterruptedException =>
         logger.info("Interrupted.")
@@ -148,6 +160,10 @@ class Coordinate @Inject()(
   implicit ec: ExecutionContext
 ) extends BaseCoordinate {
   private[this] val logger = Logger(this.getClass)
+
+  def canStartJob(): Boolean = {
+    moonlight.canStartJobOpt.get.apply()
+  }
 
   def runJob(jobId: Long): Unit = {
     logger.info(s"Coordinate starts the job (id=$jobId)")
@@ -173,7 +189,6 @@ class Work @Inject()(
   def run(args: Array[String]): Unit = {
     val id = args.head.toLong
     assert(args.size == 1)
-
 
     runJob(id)
   }
@@ -232,7 +247,9 @@ class Run @Inject()(
   implicit ec: ExecutionContext
 ) extends BaseCoordinate {
 
-  override def runJob(jobId: Long): Unit = {
+  def runJob(jobId: Long): Unit = {
     work.runJob(jobId)
   }
+
+  def canStartJob() = true
 }

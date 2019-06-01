@@ -17,7 +17,7 @@ object WorkSpec extends BaseSpec {
     val injector = mock[Injector]
     val app = mock[Application]
     val config = Config(maxErrorCountToKillOpt = Some(10), timeoutInMillis = 60L * 60L * 1000L)
-    val moonlight = new Moonlight(config, Seq(SimpleWorker, AmbiguousWorker), None)
+    val moonlight = new Moonlight(config, Seq(SimpleWorker, AmbiguousWorker), None, None)
     val backgroundJobService = mock[BackgroundJobService]
     val work = new Work(app, moonlight, backgroundJobService)
     val worker = mock[SimpleWorker]
