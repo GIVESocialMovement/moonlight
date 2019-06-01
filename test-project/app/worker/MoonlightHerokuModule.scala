@@ -47,7 +47,8 @@ class MoonlightHerokuProvider @Inject()(
         } catch {
           case e: Exception => StartJobResult(started = false)
         }
-      })
+      }),
+      Some({ () => false })
     )
   }
 }

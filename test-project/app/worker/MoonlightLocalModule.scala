@@ -26,14 +26,15 @@ class MoonlightLocalProvider @Inject()(
       Config(maxErrorCountToKillOpt = Some(3), timeoutInMillis = 60L * 60L * 1000L),
       Seq(SimpleWorkerSpec),
       Some({ job =>
-//        Process(
-//          Seq(
-//            "sbt",
-//            s"runMain givers.moonlight.Main dev work ${job.id}"
-//          )
-//        ).!
+        Process(
+          Seq(
+            "sbt",
+            s"runMain givers.moonlight.Main dev work ${job.id}"
+          )
+        ).!
         StartJobResult(started = false)
-      })
+      }),
+      Some({ () => true })
     )
   }
 }

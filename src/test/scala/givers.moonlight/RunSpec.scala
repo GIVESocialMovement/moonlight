@@ -18,7 +18,7 @@ object RunSpec extends BaseSpec {
     val injector = mock[Injector]
     val app = mock[Application]
     val config = Config(maxErrorCountToKillOpt = Some(10), timeoutInMillis = 1L * 60L * 60L * 1000L)
-    val moonlight = new Moonlight(config, Seq.empty, None)
+    val moonlight = new Moonlight(config, Seq.empty, None, None)
     val backgroundJobService = mock[BackgroundJobService]
     val work = mock[Work]
     val run = new Run(app, moonlight, backgroundJobService, work)
