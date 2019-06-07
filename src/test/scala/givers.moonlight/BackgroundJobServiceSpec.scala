@@ -157,13 +157,13 @@ object BackgroundJobServiceSpec extends BaseSpec {
       updateInitiatedAtOpt(timedOut.id, Some(new Date(System.currentTimeMillis() - 2L * TEN_MINUTES_IN_MILLIS)))  // 20 minutes
       updateInitiatedAtOpt(notTimedOut.id, Some(new Date(System.currentTimeMillis() - (TEN_MINUTES_IN_MILLIS / 2L))))  // 5 minutes
 
-      await(service.updateTimeoutInitiatededJobs())
+      await(service.updateTimeoutInitiatededJobs(TEN_MINUTES_IN_MILLIS))
 
       val retrievedTimedOut = await(service.getById(timedOut.id)).get
       val retrievedNotTimedOut = await(service.getById(notTimedOut.id)).get
       assert(
         await(service.getById(notInitiated.id)).contains(notInitiated),
-        retrievedTimedOut.status == BackgroundJob.Status.Failed,
+        retrievedTimedOut.status == BackgroundJob.Status.Pending,
         retrievedTimedOut.error == "Timeout (from Initiated)",
         retrievedTimedOut.finishedAtOpt.isDefined,
         retrievedNotTimedOut.status == BackgroundJob.Status.Initiated,

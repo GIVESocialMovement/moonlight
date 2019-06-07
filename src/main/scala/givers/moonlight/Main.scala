@@ -15,7 +15,8 @@ import scala.concurrent.{Await, ExecutionContext, Future}
 
 case class Config(
   maxErrorCountToKillOpt: Option[Int],
-  timeoutInMillis: Long
+  timeoutInMillis: Long,
+  initiateTimeoutInMillis: Long,
 )
 
 case class StartJobResult(started: Boolean)
@@ -129,7 +130,7 @@ abstract class BaseCoordinate extends Main {
   def pickAndRunJob(running: AtomicBoolean): Unit = {
     try {
       await(backgroundJobService.updateTimeoutStartedJobs(moonlight.config.timeoutInMillis))
-      await(backgroundJobService.updateTimeoutInitiatededJobs())
+      await(backgroundJobService.updateTimeoutInitiatededJobs(moonlight.config.initiateTimeoutInMillis))
 
       val isRun = run(running)
 
