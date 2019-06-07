@@ -17,7 +17,7 @@ object RunSpec extends BaseSpec {
   val tests = Tests {
     val injector = mock[Injector]
     val app = mock[Application]
-    val config = Config(maxErrorCountToKillOpt = Some(10), timeoutInMillis = 1L * 60L * 60L * 1000L)
+    val config = Config(maxErrorCountToKillOpt = Some(10), timeoutInMillis = 1L * 60L * 60L * 1000L, initiateTimeoutInMillis = 10L * 60L * 1000L)
     val moonlight = new Moonlight(config, Seq.empty, None, None)
     val backgroundJobService = mock[BackgroundJobService]
     val work = mock[Work]
@@ -27,7 +27,7 @@ object RunSpec extends BaseSpec {
 
     when(app.injector).thenReturn(injector)
     when(backgroundJobService.updateTimeoutStartedJobs(config.timeoutInMillis)).thenReturn(Future(()))
-    when(backgroundJobService.updateTimeoutInitiatededJobs()).thenReturn(Future(()))
+    when(backgroundJobService.updateTimeoutInitiatededJobs(config.initiateTimeoutInMillis)).thenReturn(Future(()))
     when(backgroundJobService.start(any())).thenReturn(Future(()))
     when(backgroundJobService.initiate(any(), any())).thenReturn(Future(()))
 
@@ -56,7 +56,7 @@ object RunSpec extends BaseSpec {
 
         verify(work).runJob(job.id)
         verify(backgroundJobService).updateTimeoutStartedJobs(config.timeoutInMillis)
-        verify(backgroundJobService).updateTimeoutInitiatededJobs()
+        verify(backgroundJobService).updateTimeoutInitiatededJobs(config.initiateTimeoutInMillis)
         verify(backgroundJobService).get()
         verify(backgroundJobService).initiate(job.id, 1)
         verifyNoMoreInteractions(backgroundJobService)
@@ -75,7 +75,7 @@ object RunSpec extends BaseSpec {
 
         verify(work).runJob(job.id)
         verify(backgroundJobService).updateTimeoutStartedJobs(config.timeoutInMillis)
-        verify(backgroundJobService).updateTimeoutInitiatededJobs()
+        verify(backgroundJobService).updateTimeoutInitiatededJobs(config.initiateTimeoutInMillis)
         verify(backgroundJobService).get()
         verify(backgroundJobService).initiate(job.id, 1)
         verifyNoMoreInteractions(backgroundJobService)
@@ -97,7 +97,7 @@ object RunSpec extends BaseSpec {
 
         verify(work, times(10)).runJob(job.id)
         verify(backgroundJobService, times(10)).updateTimeoutStartedJobs(config.timeoutInMillis)
-        verify(backgroundJobService, times(10)).updateTimeoutInitiatededJobs()
+        verify(backgroundJobService, times(10)).updateTimeoutInitiatededJobs(config.initiateTimeoutInMillis)
         verify(backgroundJobService, times(10)).get()
         verify(backgroundJobService, times(10)).initiate(job.id, 1)
         verifyNoMoreInteractions(backgroundJobService)
@@ -111,7 +111,7 @@ object RunSpec extends BaseSpec {
         running.get() ==> true
 
         verify(backgroundJobService).updateTimeoutStartedJobs(config.timeoutInMillis)
-        verify(backgroundJobService).updateTimeoutInitiatededJobs()
+        verify(backgroundJobService).updateTimeoutInitiatededJobs(config.initiateTimeoutInMillis)
         verify(backgroundJobService).get()
         verifyNoMoreInteractions(backgroundJobService)
       }
@@ -128,7 +128,7 @@ object RunSpec extends BaseSpec {
 
         verify(work).runJob(job.id)
         verify(backgroundJobService).updateTimeoutStartedJobs(config.timeoutInMillis)
-        verify(backgroundJobService).updateTimeoutInitiatededJobs()
+        verify(backgroundJobService).updateTimeoutInitiatededJobs(config.initiateTimeoutInMillis)
         verify(backgroundJobService).get()
         verify(backgroundJobService).initiate(job.id, 1)
         verifyNoMoreInteractions(backgroundJobService)
@@ -142,7 +142,7 @@ object RunSpec extends BaseSpec {
         running.get() ==> false
 
         verify(backgroundJobService).updateTimeoutStartedJobs(config.timeoutInMillis)
-        verify(backgroundJobService).updateTimeoutInitiatededJobs()
+        verify(backgroundJobService).updateTimeoutInitiatededJobs(config.initiateTimeoutInMillis)
         verify(backgroundJobService).get()
         verifyNoMoreInteractions(backgroundJobService)
       }

@@ -23,7 +23,7 @@ class MoonlightLocalProvider @Inject()(
 
   def get(): Moonlight = {
     new Moonlight(
-      Config(maxErrorCountToKillOpt = Some(3), timeoutInMillis = 60L * 60L * 1000L),
+      Config(maxErrorCountToKillOpt = Some(3), timeoutInMillis = 60L * 60L * 1000L, initiateTimeoutInMillis = 10L * 60L * 1000L),
       Seq(SimpleWorkerSpec),
       Some({ job =>
         Process(

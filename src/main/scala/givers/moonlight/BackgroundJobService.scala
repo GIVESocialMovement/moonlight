@@ -12,11 +12,6 @@ import slick.jdbc.JdbcProfile
 import scala.concurrent.duration.Duration
 import scala.concurrent.{Await, ExecutionContext, Future}
 
-object BackgroundJobService {
-  val TEN_MINUTES_IN_MILLIS = 10L * 60L * 1000L
-  val FIVE_MINUTES_IN_MILLIS = 5L * 60L * 1000L
-}
-
 @Singleton
 class BackgroundJobService @Inject()(
   val dbConfigProvider: DatabaseConfigProvider
@@ -94,10 +89,10 @@ class BackgroundJobService @Inject()(
       .map(_.headOption)
   }
 
-  def updateTimeoutInitiatededJobs(): Future[Unit] = {
+  def updateTimeoutInitiatededJobs(timeoutInMillis: Long): Future[Unit] = {
     import BackgroundJob._
 
-    val upperBoundTime = new Date(System.currentTimeMillis() - BackgroundJobService.TEN_MINUTES_IN_MILLIS)
+    val upperBoundTime = new Date(System.currentTimeMillis() - timeoutInMillis)
 
     db.run {
       query
@@ -105,7 +100,7 @@ class BackgroundJobService @Inject()(
           q.status === BackgroundJob.Status.Initiated && q.initiatedAtOpt < upperBoundTime
         }
         .map { q => (q.status, q.error, q.finishedAtOpt) }
-        .update((BackgroundJob.Status.Failed, "Timeout (from Initiated)", Some(new Date())))
+        .update((BackgroundJob.Status.Pending, "Timeout (from Initiated)", Some(new Date())))
     }.map { _ => () }
   }
 
