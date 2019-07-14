@@ -198,15 +198,15 @@ class Work @Inject()(
     val job = await(backgroundJobService.getById(jobId)).getOrElse {
       throw new Exception(s"The background job (id=$jobId) doesn't exist.")
     }
+    if (job.status != Status.Initiated) {
+      logger.warn(s"The background job's status isn't 'Initiated'; it is ${job.status}. This should have not happened. Skip")
+      return
+    }
 
     val runnable = getWorker(job.jobType)
 
     val startInMillis = Instant.now().toEpochMilli
     try {
-      if (job.status != Status.Initiated) {
-        throw new Exception(s"The background job's status isn't 'Initiated'; it is ${job.status}")
-      }
-
       await(backgroundJobService.start(job.id))
       logger.info(s"Started ${runnable.getClass.getSimpleName} (id=${job.id})")
       runnable.run(job)
