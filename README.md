@@ -38,7 +38,7 @@ Please apply the SQLs to your database.
 
 ```
 resolvers += Resolver.bintrayRepo("givers", "maven")
-libraryDependencies += "givers.moonlight" %% "play-moonlight" % "0.3.0"
+libraryDependencies += "givers.moonlight" %% "play-moonlight" % "0.4.0"
 ```
 
 The artifacts are hosted here: https://bintray.com/givers/maven/play-moonlight
