@@ -111,7 +111,8 @@ abstract class BaseCoordinate extends Main {
           runJob(job.id)
         } catch {
           case e: InterruptedException => throw e
-          case _: Throwable =>
+          case e: Throwable =>
+            logger.error("Error while running a job", e)
             errorCount.incrementAndGet()
 
             moonlight.config.maxErrorCountToKillOpt.foreach { maxErrorCountToKill =>
