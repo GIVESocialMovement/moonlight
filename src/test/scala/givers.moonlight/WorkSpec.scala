@@ -99,6 +99,22 @@ object WorkSpec extends BaseSpec {
         verifyNoMoreInteractions(backgroundJobService)
       }
 
+      "Unrecognized job type fails the job" - {
+        val unrecognizedJob = job.copy(id = 1234L, jobType = "ItsUnrecognizedJobType")
+        when(backgroundJobService.getById(any())).thenReturn(Future(Some(unrecognizedJob)))
+        when(worker.run(any())).thenAnswer(new Answer[Unit] {
+          override def answer(invocation: InvocationOnMock) = throw new Exception("FakeError")
+        })
+
+        intercept[Exception] {
+          work.runJob(unrecognizedJob.id)
+        }
+
+        verify(backgroundJobService).getById(unrecognizedJob.id)
+        verify(backgroundJobService).fail(eq(unrecognizedJob.id), argThat { e: Throwable => e.getMessage == "Unrecognized job type 'ItsUnrecognizedJobType'." })
+        verifyNoMoreInteractions(backgroundJobService)
+      }
+
       "InterruptedException occurs" - {
         when(worker.run(any())).thenAnswer(new Answer[Unit] {
           override def answer(invocation: InvocationOnMock) = throw new InterruptedException()
