@@ -204,10 +204,10 @@ class Work @Inject()(
       return
     }
 
-    val runnable = getWorker(job.jobType)
-
     val startInMillis = Instant.now().toEpochMilli
     try {
+      val runnable = getWorker(job.jobType)
+
       await(backgroundJobService.start(job.id))
       logger.info(s"Started ${runnable.getClass.getSimpleName} (id=${job.id})")
       runnable.run(job)
@@ -217,12 +217,12 @@ class Work @Inject()(
       case e: InterruptedException => throw e
       case e: Throwable =>
         await(backgroundJobService.fail(job.id, e))
-        logger.error(s"Error occurred while running ${runnable.getClass.getSimpleName} (id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}.", e)
-        logger.info(s"Finished ${runnable.getClass.getSimpleName} (id=${job.id}) with the above error")
+        logger.error(s"Error occurred while running the job (id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}, tryCount=${job.tryCount}).", e)
         throw e
+    } finally {
+      val duration = Instant.now().toEpochMilli - startInMillis
+      logger.info(s"The job (id=${job.id}) took $duration millis")
     }
-    val duration = Instant.now().toEpochMilli - startInMillis
-    logger.info(s"The job (id=${job.id}) took $duration millis")
   }
 
   private[moonlight] def getWorker(jobType: String): Worker[_] = {
