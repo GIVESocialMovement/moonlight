@@ -13,20 +13,27 @@ libraryDependencies ++= Seq(
 )
 
 organization := "io.github.givesocialmovement"
-name := "play-moonlight"
-version := "0.16.3"
-parallelExecution in Test := false
 
-publishMavenStyle := true
+name := "play-moonlight"
+
+version := "0.16.3"
+
+parallelExecution in Test := false
 
 bintrayOrganization := Some("givers")
 
 bintrayRepository := "maven"
 
-publishArtifact in Test := false
+ThisBuild / sonatypeCredentialHost := "s01.oss.sonatype.org"
 
 pomIncludeRepository := { _ => false }
 
 licenses := Seq(("MIT", url("http://opensource.org/licenses/MIT")))
 
 testFrameworks += new TestFramework("utest.runner.Framework")
+
+publishMavenStyle := true
+
+publishArtifact in Test := false
+
+publishTo := sonatypePublishToBundle.value
