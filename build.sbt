@@ -18,7 +18,7 @@ name := "play-moonlight"
 
 version := "0.16.3"
 
-parallelExecution in Test := false
+Test / parallelExecution := false
 
 bintrayOrganization := Some("givers")
 
@@ -34,6 +34,6 @@ testFrameworks += new TestFramework("utest.runner.Framework")
 
 publishMavenStyle := true
 
-publishArtifact in Test := false
+Test / publishArtifact := false
 
 publishTo := sonatypePublishToBundle.value
