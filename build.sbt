@@ -1,6 +1,6 @@
 lazy val moonlight = project in file(".")
 
-scalaVersion := "2.12.11"
+scalaVersion := "2.13.8"
 
 libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-slick" % "5.0.0" withSources() withJavadoc(),
@@ -9,24 +9,31 @@ libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-json" % "2.8.1",
   "com.typesafe.play" %% "play-slick-evolutions" % "5.0.0" % Test,
   "org.mockito" % "mockito-core" % "2.18.3" % Test,
-  "com.lihaoyi" %% "utest" % "0.6.3" % Test
+  "com.lihaoyi" %% "utest" % "0.7.10" % Test
 )
 
-organization := "givers.moonlight"
-name := "play-moonlight"
-version := "0.16.2"
-parallelExecution in Test := false
+organization := "io.github.givesocialmovement"
 
-publishMavenStyle := true
+name := "play-moonlight"
+
+version := "0.16.3"
+
+Test / parallelExecution := false
 
 bintrayOrganization := Some("givers")
 
 bintrayRepository := "maven"
 
-publishArtifact in Test := false
+ThisBuild / sonatypeCredentialHost := "s01.oss.sonatype.org"
 
 pomIncludeRepository := { _ => false }
 
 licenses := Seq(("MIT", url("http://opensource.org/licenses/MIT")))
 
 testFrameworks += new TestFramework("utest.runner.Framework")
+
+publishMavenStyle := true
+
+Test / publishArtifact := false
+
+publishTo := sonatypePublishToBundle.value
