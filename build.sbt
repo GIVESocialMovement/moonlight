@@ -28,6 +28,19 @@ ThisBuild / sonatypeCredentialHost := "s01.oss.sonatype.org"
 
 pomIncludeRepository := { _ => false }
 
+homepage := Some(url("https://github.com/GIVESocialMovement/moonlight"))
+
+scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/GIVESocialMovement/moonlight"),
+    "scm:git@github.com:GIVESocialMovement/moonlight.git"
+  )
+)
+
+developers := List(
+  Developer(id="tanin", name="tanin", email="developers@giveasia.org", url=url("https://github.com/tanin47"))
+)
+
 licenses := Seq(("MIT", url("http://opensource.org/licenses/MIT")))
 
 testFrameworks += new TestFramework("utest.runner.Framework")
