@@ -1,4 +1,4 @@
-Moonlight
+Moonlight (version 1)
 ==========
 
 [![CircleCI](https://circleci.com/gh/GIVESocialMovement/moonlight/tree/master.svg?style=shield)](https://circleci.com/gh/GIVESocialMovement/moonlight/tree/master)

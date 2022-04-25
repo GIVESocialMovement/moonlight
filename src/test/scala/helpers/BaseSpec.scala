@@ -123,7 +123,7 @@ abstract class BaseSpec extends TestSuite {
   def verify[T](mock: T) = org.mockito.Mockito.verify(mock)
   def verify[T](mock: T, mode: VerificationMode) = org.mockito.Mockito.verify(mock, mode)
   def verifyNoMoreInteractions(mocks: AnyRef*) = org.mockito.Mockito.verifyNoMoreInteractions(mocks:_*)
-  def verifyZeroInteractions(mocks: AnyRef*) = org.mockito.Mockito.verifyZeroInteractions(mocks:_*)
+  def verifyZeroInteractions(mocks: AnyRef*) = org.mockito.MockitoSugar.verifyZeroInteractions(mocks:_*)
   def when[T](methodCall: T) = org.mockito.Mockito.when(methodCall)
   def doThrow(toBeThrown: Throwable*) = org.mockito.Mockito.doThrow(toBeThrown:_*)
 }

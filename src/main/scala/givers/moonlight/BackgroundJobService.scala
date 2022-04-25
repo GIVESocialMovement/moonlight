@@ -1,29 +1,24 @@
 package givers.moonlight
 
-import java.util.Date
-import java.util.concurrent.TimeUnit
-
 import com.google.inject.{Inject, Singleton}
-import play.api.Logger
+import givers.moonlight.persistence.table.BackgroundJobTableComponent
 import play.api.db.slick.{DatabaseConfigProvider, HasDatabaseConfigProvider}
 import play.api.libs.json.OFormat
 import slick.jdbc.JdbcProfile
 
-import scala.concurrent.duration.Duration
-import scala.concurrent.{Await, ExecutionContext, Future}
+import java.util.Date
+import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class BackgroundJobService @Inject()(
   val dbConfigProvider: DatabaseConfigProvider
 )(
   implicit ec: ExecutionContext
-) extends HasDatabaseConfigProvider[JdbcProfile] {
+) extends HasDatabaseConfigProvider[JdbcProfile] with BackgroundJobTableComponent {
 
   import dbConfig.profile.api._
 
-  val query = TableQuery[BackgroundJobTable]
-
-  private[this] val logger = Logger(this.getClass)
+  val query = backgroundJobs
 
   def queue[T <: Job](
     shouldRunAt: Date,

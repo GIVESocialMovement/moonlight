@@ -1,11 +1,14 @@
 package givers.moonlight
 
-import java.util.Date
+import givers.moonlight.persistence.table.postgres.PgBackgroundJobTableComponent
 
+import java.util.Date
 import helpers.{BaseSpec, SimpleWorker}
 import utest._
 
 object BackgroundJobServiceSpec extends BaseSpec {
+
+  val tc = new PgBackgroundJobTableComponent
 
   val ONE_HOUR_IN_MILLIS = 3600L * 1000L
   val TEN_MINUTES_IN_MILLIS = 60L * 10L * 1000L
@@ -174,32 +177,29 @@ object BackgroundJobServiceSpec extends BaseSpec {
   }
 
   def updateInitiatedAtOpt(id: Long, initiatedAtOpt: Option[Date]): Unit = {
-    import BackgroundJob._
-    import slick.jdbc.PostgresProfile.api._
+    import tc.profile.api._
+    import tc._
 
-    val query = TableQuery[BackgroundJobTable]
     await(BaseSpec.db.run {
-      query.filter(_.id === id).map(_.initiatedAtOpt).update(initiatedAtOpt)
+      tc.backgroundJobs.filter(_.id === id).map(_.initiatedAtOpt).update(initiatedAtOpt)
     })
   }
 
   def updateStartedAtOpt(id: Long, startedAtOpt: Option[Date]): Unit = {
-    import BackgroundJob._
-    import slick.jdbc.PostgresProfile.api._
+    import tc.profile.api._
+    import tc._
 
-    val query = TableQuery[BackgroundJobTable]
     await(BaseSpec.db.run {
-      query.filter(_.id === id).map(_.startedAtOpt).update(startedAtOpt)
+      tc.backgroundJobs.filter(_.id === id).map(_.startedAtOpt).update(startedAtOpt)
     })
   }
 
   def updateFinishedAtOpt(id: Long, finishedAtOpt: Option[Date]): Unit = {
-    import BackgroundJob._
-    import slick.jdbc.PostgresProfile.api._
+    import tc.profile.api._
+    import tc._
 
-    val query = TableQuery[BackgroundJobTable]
     await(BaseSpec.db.run {
-      query.filter(_.id === id).map(_.finishedAtOpt).update(finishedAtOpt)
+      tc.backgroundJobs.filter(_.id === id).map(_.finishedAtOpt).update(finishedAtOpt)
     })
   }
 }
