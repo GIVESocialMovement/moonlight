@@ -8,7 +8,7 @@ import scala.reflect.ClassTag
 abstract class Job
 case class JobId[T](value: String)
 
-abstract class WorkerSpec {
+trait WorkerSpec {
   type Data <: Job
   type Runner <: Worker[Data]
 
@@ -19,4 +19,8 @@ abstract class WorkerSpec {
   implicit def jsonFormat: OFormat[Data]
 
   implicit def idToJobId: JobId[Data] = JobId(identifier)
+}
+
+trait AsyncWorkerSpec extends WorkerSpec {
+  type Runner <: Worker[Data] with AsyncSupport[Data]
 }

@@ -1,0 +1,41 @@
+@(jobs: Seq[givers.moonlight.BackgroundJob])
+
+<html>
+  <body>
+    <h1>The last 100 jobs</h1>
+
+    <table cellpadding="2" cellspacing="2" border="1">
+      <tr>
+        <th>Date</th>
+        <th>Job id</th>
+        <th>Job type</th>
+        <th>Param</th>
+        <th>Status</th>
+        <th>Scheduled to run at</th>
+        <th>Initiated at</th>
+        <th>Started at</th>
+        <th>Finished at</th>
+      </tr>
+      @jobs.map { job =>
+        <tr>
+          <td>@job.createdAt.toString()</td>
+          <td>@job.id</td>
+          <td>@job.jobType</td>
+          <td>@job.paramsInJsonString</td>
+          <td>@job.status</td>
+          <td>@job.shouldRunAt.toString()</td>
+          <td>@job.initiatedAtOpt.map(_.toString())</td>
+          <td>@job.startedAtOpt.map(_.toString())</td>
+          <td>@job.finishedAtOpt.map(_.toString())</td>
+        </tr>
+      }
+    </table>
+    <br/>
+    <h1>Add a new job</h1>
+    <form action="@routes.HomeController.add" method="post">
+      Data: <input type="text" name="data" value="some string"><br/>
+      Priority: <input type="text" name="priority" value="0"><br/>
+      <input type="submit" value="Add">
+    </form>
+  </body>
+</html>
