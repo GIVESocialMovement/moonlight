@@ -67,7 +67,12 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
       Option.when(untilRunning.get())(()) match {
         case Some(_) =>
           bgJobRepo
-            .getJobReadyForStart(settings.maxJobRetries, dateTimeFactory.now, settings.betweenRunAttemptInterval)
+            .getJobReadyForStart(
+              settings.maxJobRetries,
+              dateTimeFactory.now,
+              settings.betweenRunAttemptInterval,
+              settings.supportedWorkerTypes
+            )
             .onComplete {
               case Success(Some(job)) =>
                 runJob(job, threadSeqId).foreach(_ => runForever(threadSeqId))

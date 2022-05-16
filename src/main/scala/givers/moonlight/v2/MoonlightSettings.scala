@@ -27,6 +27,10 @@ case class MoonlightSettings(
   jobRunTimeout: FiniteDuration,
   workerSpecs: Seq[AsyncWorkerSpec]
 ) {
+  // these types are needed for proper job filter to avoid collision with Moonlight v1
+  //todo get rid of it when all jobs will be transferred to v2
+  lazy val supportedWorkerTypes: Seq[String] = workerSpecs.flatMap(w => w.previousIdentifiers + w.identifier)
+
   /**
    * Get worker for a job type
    *

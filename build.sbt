@@ -5,6 +5,7 @@ scalaVersion := "2.13.8"
 libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-slick" % "5.0.0" withSources() withJavadoc(),
   "com.typesafe.play" %% "play-guice" % "2.8.2" withSources() withJavadoc(),
+  "com.google.inject" % "guice" % "5.1.0",
   "org.postgresql" % "postgresql" % "42.2.14" withSources() withJavadoc(),
   "com.typesafe.play" %% "play-json" % "2.8.1",
   "io.netty" % "netty-common" % "4.1.76.Final",
@@ -21,7 +22,7 @@ organization := "io.github.givesocialmovement"
 
 name := "play-moonlight"
 
-version := "0.17.0"
+version := "0.17.1"
 
 Test / parallelExecution := false
 

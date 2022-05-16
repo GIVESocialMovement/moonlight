@@ -26,7 +26,10 @@ class Moonlight(
   val workers: Seq[WorkerSpec],
   val startJobOpt: Option[BackgroundJob => StartJobResult],
   val canStartJobOpt: Option[() => Boolean]
-)
+) {
+  // these types are needed for proper job filter to avoid collision with Moonlight v2
+  lazy val supportedWorkerTypes: Seq[String] = workers.flatMap(w => w.previousIdentifiers + w.identifier)
+}
 
 object Main {
   private[this] val logger = Logger(this.getClass)

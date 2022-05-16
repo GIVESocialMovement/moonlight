@@ -16,7 +16,7 @@ object SimpleWorkerSpec extends AsyncWorkerSpec {
   implicit val classTag = ClassTag(classOf[SimpleWorker])
   implicit val jsonFormat: OFormat[Job] = Json.format[Job]
 
-  val identifier = "Simple"
+  val identifier = "SimpleAsync"
   val previousIdentifiers = Set.empty
 }
 

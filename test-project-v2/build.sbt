@@ -16,6 +16,7 @@ run / fork := true
 libraryDependencies ++= Seq(
   ws,
   guice,
+  "com.google.inject" % "guice" % "5.1.0",
   "com.typesafe.play" %% "play-slick" % "5.0.0",
   "com.typesafe.play" %% "play-slick-evolutions" % "5.0.0",
   "org.postgresql" % "postgresql" % "42.2.14"

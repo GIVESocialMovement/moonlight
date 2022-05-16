@@ -3,7 +3,7 @@ package givers.moonlight
 import givers.moonlight.persistence.table.postgres.PgBackgroundJobTableComponent
 
 import java.util.Date
-import helpers.{BaseSpec, SimpleWorker}
+import helpers.{AnotherWorker, BaseSpec, SimpleWorker}
 import utest._
 
 object BackgroundJobServiceSpec extends BaseSpec {
@@ -15,12 +15,23 @@ object BackgroundJobServiceSpec extends BaseSpec {
 
   val tests = Tests {
     resetDatabase()
-    val service = new BackgroundJobService(dbConfigProvider)
+    val moonlight = new Moonlight(
+      config = Config(None, 3000, 3000),
+      workers = Seq(SimpleWorker),
+      startJobOpt = None,
+      canStartJobOpt = None
+    )
+    val service = new BackgroundJobService(moonlight, dbConfigProvider)
 
     "Queue a job and get" - {
       assert(await(service.get()).isEmpty)
 
       val shouldRunAt = new Date(System.currentTimeMillis() - 1L)
+
+      // AnotherWorker is absent in supportedWorkerTypes so should be ignored
+      await(service.queue(shouldRunAt, 1, AnotherWorker.Job("some work")))
+      assert(await(service.get()).isEmpty)
+
       val low = await(service.queue(shouldRunAt, 1, SimpleWorker.Job("some work")))
       val high = await(service.queue(shouldRunAt, 0, SimpleWorker.Job("some work")))
 

@@ -28,6 +28,24 @@ class SimpleWorker @Inject()() extends Worker[SimpleWorker.Job] {
   }
 }
 
+object AnotherWorker extends WorkerSpec {
+  case class Job(data: String) extends givers.moonlight.Job
+
+  type Data = Job
+  type Runner = AnotherWorker
+
+  implicit val classTag = ClassTag(classOf[AnotherWorker])
+  implicit val jsonFormat: OFormat[Job] = Json.format[Job]
+
+  val identifier = "Another"
+  val previousIdentifiers = Set.empty
+}
+
+@Singleton
+class AnotherWorker @Inject()() extends Worker[AnotherWorker.Job] {
+  def run(param: AnotherWorker.Job, job: BackgroundJob): Unit = ()
+}
+
 object AmbiguousWorker extends WorkerSpec {
   case class Job(data: String) extends givers.moonlight.Job
 

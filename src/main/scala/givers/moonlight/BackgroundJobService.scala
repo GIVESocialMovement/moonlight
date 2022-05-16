@@ -11,6 +11,7 @@ import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class BackgroundJobService @Inject()(
+  moonlight: Moonlight,
   val dbConfigProvider: DatabaseConfigProvider
 )(
   implicit ec: ExecutionContext
@@ -51,15 +52,18 @@ class BackgroundJobService @Inject()(
   }
 
   def getAll(limit: Int): Future[Seq[BackgroundJob]] = {
-    import BackgroundJob._
     db.run {
-      query.sortBy(_.id.desc).take(limit).result
+      query
+        .filter { q =>
+          q.jobType.inSet(moonlight.supportedWorkerTypes)
+        }
+        .sortBy(_.id.desc)
+        .take(limit)
+        .result
     }
   }
 
   def get(): Future[Option[BackgroundJob]] = {
-    import BackgroundJob._
-
     val now = new Date()
     val oneHourInMillis = 60L * 60L * 1000L
     val oneHourAgo = new Date(now.getTime - oneHourInMillis)
@@ -67,8 +71,10 @@ class BackgroundJobService @Inject()(
     db.run {
       query
         .filter { q =>
-          (q.status === BackgroundJob.Status.Pending && q.shouldRunAt < now) ||
-            (q.status === BackgroundJob.Status.Failed && q.tryCount < 3 && q.finishedAtOpt < oneHourAgo)
+          q.jobType.inSet(moonlight.supportedWorkerTypes) &&
+            ((q.status === BackgroundJob.Status.Pending && q.shouldRunAt < now) ||
+            (q.status === BackgroundJob.Status.Failed && q.tryCount < 3 && q.finishedAtOpt < oneHourAgo))
+
         }
         .sortBy { q => (q.priority.asc, q.createdAt.asc) }
         .take(1)
@@ -85,8 +91,6 @@ class BackgroundJobService @Inject()(
   }
 
   def updateTimeoutInitiatededJobs(timeoutInMillis: Long): Future[Unit] = {
-    import BackgroundJob._
-
     val upperBoundTime = new Date(System.currentTimeMillis() - timeoutInMillis)
 
     db.run {
@@ -100,8 +104,6 @@ class BackgroundJobService @Inject()(
   }
 
   def updateTimeoutStartedJobs(timeoutInMillis: Long): Future[Unit] = {
-    import BackgroundJob._
-
     val upperBoundTime = new Date(System.currentTimeMillis() - timeoutInMillis)
 
     db.run {
@@ -115,8 +117,6 @@ class BackgroundJobService @Inject()(
   }
 
   def initiate(id: Long, newTryCount: Int): Future[Unit] = {
-    import BackgroundJob._
-
     db
       .run {
         query
@@ -130,8 +130,6 @@ class BackgroundJobService @Inject()(
   }
 
   def uninitiate(id: Long, newTryCount: Int): Future[Unit] = {
-    import BackgroundJob._
-
     db
       .run {
         query
@@ -145,8 +143,6 @@ class BackgroundJobService @Inject()(
   }
 
   def start(id: Long): Future[Unit] = {
-    import BackgroundJob._
-
     db
       .run {
         query
@@ -160,8 +156,6 @@ class BackgroundJobService @Inject()(
   }
 
   def succeed(id: Long): Future[Unit] = {
-    import BackgroundJob._
-
     db
       .run {
         query
@@ -176,8 +170,6 @@ class BackgroundJobService @Inject()(
   }
 
   def fail(id: Long, e: Throwable): Future[Unit] = {
-    import BackgroundJob._
-
     db
       .run {
         query
