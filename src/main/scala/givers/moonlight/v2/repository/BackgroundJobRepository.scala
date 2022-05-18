@@ -26,9 +26,11 @@ trait BackgroundJobRepository {
    *
    * @param skip number of skipped records
    * @param take desired number of records
+   * @param supportedWorkerTypes supported worker types @see[[givers.moonlight.v2.MoonlightSettings.supportedWorkerTypes]]
+   *                             todo get rid of it after full v2 migration
    * @return
    */
-  def getJobs(skip: Long, take: Long): Future[Seq[BackgroundJob]]
+  def getJobs(skip: Long, take: Long, supportedWorkerTypes: Seq[String]): Future[Seq[BackgroundJob]]
 
   /**
    * Get pending jobs and jobs that were failed some time ago that still can be retried
@@ -37,13 +39,16 @@ trait BackgroundJobRepository {
    * @param maxAcceptableAttemptsCount "try count" upper bound
    * @param now current date
    * @param betweenAttemptInterval how long to wait after a "failed attempt" before trying again
+   * @param supportedWorkerTypes supported worker types @see[[givers.moonlight.v2.MoonlightSettings.supportedWorkerTypes]]
+   *                             todo get rid of it after full v2 migration
    * @return
    */
   def getJobsReadyForStart(
     desiredNumberOfJobs: Long,
     maxAcceptableAttemptsCount: Int,
     now: Date,
-    betweenAttemptInterval: FiniteDuration
+    betweenAttemptInterval: FiniteDuration,
+    supportedWorkerTypes: Seq[String]
   ): Future[Seq[BackgroundJob]]
 
   /**
@@ -52,12 +57,15 @@ trait BackgroundJobRepository {
    * @param maxAcceptableAttemptsCount "try count" upper bound
    * @param now current date
    * @param betweenAttemptInterval how long to wait after a "failed attempt" before trying again
+   * @param supportedWorkerTypes supported worker types @see[[givers.moonlight.v2.MoonlightSettings.supportedWorkerTypes]]
+   *                             todo get rid of it after full v2 migration
    * @return
    */
   def getJobReadyForStart(
     maxAcceptableAttemptsCount: Int,
     now: Date,
-    betweenAttemptInterval: FiniteDuration
+    betweenAttemptInterval: FiniteDuration,
+    supportedWorkerTypes: Seq[String]
   ): Future[Option[BackgroundJob]]
 
   /**

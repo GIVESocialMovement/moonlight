@@ -85,7 +85,7 @@ class JobDispatcherSpec
       val allJobsWereUsed = Promise[Unit]
 
       // simulates 3+ calls of job retrieving method
-      repo.getJobReadyForStart(3, currentDate, 30.minutes)
+      repo.getJobReadyForStart(3, currentDate, 30.minutes, settings.supportedWorkerTypes)
         // this job will be completed
         .returns(Future.successful(Some(jobOfType("Worker1", firstId).copy(paramsInJsonString = """{"shouldSucceed": true}"""))))
         // there is no worker for this job so it will just log error

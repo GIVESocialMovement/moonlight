@@ -29,27 +29,6 @@ class BackgroundJobJdbcRepository @Inject()(
   import dbConfig.profile.api._
   import table._
 
-  private val getJobsQuery = Compiled((skip: ConstColumn[Long], take: ConstColumn[Long]) =>
-    backgroundJobs.sortBy(_.id.desc).drop(skip).take(take)
-  )
-
-  private val getJobsReadyForStartQuery = Compiled((
-    desiredNumberOfJobs: ConstColumn[Long],
-    maxAcceptableAttemptsCount: Rep[Int],
-    now: Rep[Date],
-    lastAttemptAfter: Rep[Date]
-  ) => {
-      backgroundJobs
-        .filter { job =>
-          (job.status === Status.Pending && job.shouldRunAt < now) ||
-            (job.status === Status.Failed
-              && job.tryCount < maxAcceptableAttemptsCount
-              && job.finishedAtOpt < lastAttemptAfter) // one attempt for some period of time
-        }
-        .sortBy { job => (job.priority.asc, job.createdAt.asc) }
-        .take(desiredNumberOfJobs)
-  })
-
   private val markJobAsFailedSelectQuery = Compiled((bgJobId: Rep[Long]) =>
     backgroundJobs
       .filter(_.id === bgJobId)
@@ -92,8 +71,8 @@ class BackgroundJobJdbcRepository @Inject()(
   /**
    * @inheritdoc
    */
-  override def getJobs(skip: Long, take: Long): Future[Seq[BackgroundJob]] = {
-    db.run(getJobsQuery(skip, take).result)
+  override def getJobs(skip: Long, take: Long, supportedWorkerTypes: Seq[String]): Future[Seq[BackgroundJob]] = {
+    db.run(backgroundJobs.filter(_.jobType.inSet(supportedWorkerTypes)).sortBy(_.id.desc).drop(skip).take(take).result)
   }
 
   /**
@@ -103,11 +82,25 @@ class BackgroundJobJdbcRepository @Inject()(
     desiredNumberOfJobs: Long,
     maxAcceptableAttemptsCount: Int,
     now: Date,
-    betweenAttemptInterval: FiniteDuration
+    betweenAttemptInterval: FiniteDuration,
+    supportedWorkerTypes: Seq[String]
   ): Future[Seq[BackgroundJob]] = {
     val lastAttemptAfter = now.sub(betweenAttemptInterval)
 
-    db.run(getJobsReadyForStartQuery(desiredNumberOfJobs, maxAcceptableAttemptsCount, now, lastAttemptAfter).result)
+    db.run(
+      // this request can't be compiled because of inSet
+      backgroundJobs
+        .filter { job =>
+          job.jobType.inSet(supportedWorkerTypes) &&
+          ((job.status === Status.Pending && job.shouldRunAt < now) ||
+            (job.status === Status.Failed
+              && job.tryCount < maxAcceptableAttemptsCount
+              && job.finishedAtOpt < lastAttemptAfter)) // one attempt for some period of time
+        }
+        .sortBy { job => (job.priority.asc, job.createdAt.asc) }
+        .take(desiredNumberOfJobs)
+        .result
+    )
   }
 
   /**
@@ -116,9 +109,10 @@ class BackgroundJobJdbcRepository @Inject()(
   override def getJobReadyForStart(
     maxAcceptableAttemptsCount: Int,
     now: Date,
-    betweenAttemptInterval: FiniteDuration
+    betweenAttemptInterval: FiniteDuration,
+    supportedWorkerTypes: Seq[String]
   ): Future[Option[BackgroundJob]] = {
-    getJobsReadyForStart(1, maxAcceptableAttemptsCount, now, betweenAttemptInterval)
+    getJobsReadyForStart(1, maxAcceptableAttemptsCount, now, betweenAttemptInterval, supportedWorkerTypes)
       .map(_.headOption)
   }
 

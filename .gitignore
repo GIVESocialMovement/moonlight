@@ -1,6 +1,7 @@
 logs
 target
 .DS_Store
+.bsp
 .g8
 .idea
 .idea_modules

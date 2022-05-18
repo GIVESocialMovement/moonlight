@@ -5,6 +5,7 @@ import givers.moonlight.v2.repository.BackgroundJobRepository
 
 import java.util.Date
 
+import givers.moonlight.v2.MoonlightSettings
 import javax.inject.{Inject, Singleton}
 import play.api.mvc.{AbstractController, ControllerComponents}
 import play.api.data.Form
@@ -16,11 +17,12 @@ import scala.concurrent.ExecutionContext
 @Singleton
 class HomeController @Inject()(
                                 repo: BackgroundJobRepository,
-                                controllerComponents: ControllerComponents
+                                controllerComponents: ControllerComponents,
+                                moonlightSettings: MoonlightSettings
 )(implicit ec: ExecutionContext) extends AbstractController(controllerComponents)  {
 
   def index = Action.async {
-    repo.getJobs(0, 10).map { jobs =>
+    repo.getJobs(0, 10, moonlightSettings.supportedWorkerTypes).map { jobs =>
       Ok(views.html.index(jobs))
     }
   }

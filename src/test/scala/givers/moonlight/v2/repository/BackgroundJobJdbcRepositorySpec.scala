@@ -73,9 +73,11 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
       for {
         _ <- insertJob(jobExample)
         two <- insertJob(jobExample)
+        // wrong status
+        _ <- insertJob(jobExample.copy(jobType = "other-type"))
         three <- insertJob(jobExample)
         _ <- insertJob(jobExample)
-        jobs <- repo.getJobs(skip = 1, take = 2)
+        jobs <- repo.getJobs(skip = 1, take = 2, Seq("example"))
       } yield {
         jobs.map(_.id) should contain theSameElementsAs Seq(two.id, three.id)
       }
@@ -96,6 +98,8 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
           tryCount = maxAttempts - 1,
           finishedAtOpt = Some(new Date(currentDate.getTime - interval.toMillis - 1)))
         )
+        // wrong type
+        _ <- insertJob(jobExample.copy(jobType = "other-type"))
         // is not supposed to be started now
         _ <- insertJob(jobExample.copy(shouldRunAt = futureDate))
         // max attempts reached
@@ -108,8 +112,8 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
         _ <- insertJob(jobExample.copy(status = Status.Started))
         // wrong status
         _ <- insertJob(jobExample.copy(status = Status.Succeeded))
-        jobs <- repo.getJobsReadyForStart(3, maxAttempts, currentDate, interval)
-        topJob <- repo.getJobReadyForStart(maxAttempts, currentDate, interval)
+        jobs <- repo.getJobsReadyForStart(3, maxAttempts, currentDate, interval, Seq("example"))
+        topJob <- repo.getJobReadyForStart(maxAttempts, currentDate, interval, Seq("example"))
       } yield {
         jobs shouldBe Seq(okToStart, okToRestart)
         topJob shouldBe Some(okToStart)
@@ -126,7 +130,7 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
         fourth <- insertJob(jobExample.copy(priority = 2, createdAt = aBitLater))
         // status is not important
         third <- insertJob(jobExample.copy(priority = 2, createdAt = now, status = Status.Failed, finishedAtOpt = Some(now)))
-        jobs <- repo.getJobsReadyForStart(4, 1, aBitLater, 0.second)
+        jobs <- repo.getJobsReadyForStart(4, 1, aBitLater, 0.second, Seq("example"))
       } yield {
         jobs.map(_.id) shouldBe Seq(first, second, third, fourth).map(_.id)
       }
