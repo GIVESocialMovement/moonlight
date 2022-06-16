@@ -33,7 +33,7 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
 
   case class JobExampleParam(campaignId: Long, oneMoreId: String) extends givers.moonlight.Job
 
-  private implicit val jobId = JobId[JobExampleParam]("example")
+  private implicit val jobId: JobId[JobExampleParam] = JobId[JobExampleParam]("example")
   private implicit val jsonFormat: OFormat[JobExampleParam] = Json.format[JobExampleParam]
   private val param =  JobExampleParam(444, "555")
   private val priority = 1
@@ -198,6 +198,19 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
           isChanged shouldBe false
 
           dbContent should contain theSameElementsAs Seq(first, dummy)
+        }
+      }
+      "job is already succeeded" in {
+        val updateDate = nowDate.add(1.minute)
+
+        for {
+          first <- insertJob(jobExample.copy(status = Status.Succeeded, startedAtOpt = Some(updateDate)))
+          isChanged <- repo.markJobAsStarted(first.id, 1, updateDate)
+          dbContent <- db.run(tables.backgroundJobs.result)
+        } yield {
+          isChanged shouldBe false
+
+          dbContent should contain theSameElementsAs Seq(first)
         }
       }
     }
