@@ -43,7 +43,7 @@ class BackgroundJobJdbcRepository @Inject()(
 
   private val markJobAsStartedSelectQuery = Compiled((bgJobId: Rep[Long]) =>
     backgroundJobs
-      .filter(job => job.id === bgJobId && job.status =!= Status.Started)
+      .filter(job => job.id === bgJobId && job.status.inSet(Seq(Status.Pending, Status.Initiated, Status.Failed)))
       .map(job => (job.status, job.startedAtOpt, job.initiatedAtOpt, job.tryCount))
   )
 
@@ -141,9 +141,9 @@ class BackgroundJobJdbcRepository @Inject()(
    */
   override def markJobAsStarted(bgJobId: Long, newTryCount: Int, updateDate: Date): Future[Boolean] = {
     db
-      .run {
+      .run(
         markJobAsStartedSelectQuery(bgJobId).update((Status.Started, Some(updateDate), Some(updateDate), newTryCount))
-      }
+      )
       .map(_ == 1)
   }
 
@@ -152,7 +152,9 @@ class BackgroundJobJdbcRepository @Inject()(
    */
   override def markJobAsSucceed(bgJobId: Long, updateDate: Date): Future[Unit] = {
     db
-      .run(markJobAsSucceededSelectQuery(bgJobId).update((Status.Succeeded, Some(updateDate))))
+      .run(
+        markJobAsSucceededSelectQuery(bgJobId).update((Status.Succeeded, Some(updateDate)))
+      )
       .map(_ => ())
   }
 
