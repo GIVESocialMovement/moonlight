@@ -6,16 +6,16 @@ import com.google.inject.Singleton
 import givers.moonlight.BackgroundJob
 import givers.moonlight.util.DateTimeFactory
 import givers.moonlight.util.RichFuture.TimeoutAwareFuture
-import givers.moonlight.v2.repository.BackgroundJobRepository
+import givers.moonlight.v2.repository.{BackgroundJobRepository, JobReadyForStartCheckParams}
 import play.api.Logger
 import play.api.inject.Injector
 
 import java.time.Instant
 import java.util.concurrent.atomic.AtomicBoolean
 import javax.inject.Inject
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.{Failure, Success}
+import scala.util.{Failure, Random, Success}
 
 class JobExecutionError(realCause: Throwable) extends Exception("Job execution error", realCause)
 
@@ -29,11 +29,15 @@ class JobExecutionError(realCause: Throwable) extends Exception("Job execution e
  * @param executionContext execution context
  * @param injector DI system injector
  * @param scheduler task scheduler
+ * @param random randomizer for duration randomization
  */
 class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
                     settings: MoonlightSettings,
                     dateTimeFactory: DateTimeFactory
-                   )(implicit executionContext: ExecutionContext, injector: Injector, scheduler: Scheduler) {
+                   )(implicit executionContext: ExecutionContext,
+                     injector: Injector,
+                     scheduler: Scheduler,
+                     random: Random) {
   private[this] val logger = Logger(this.getClass)
 
   /**
@@ -68,9 +72,11 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
         case Some(_) =>
           bgJobRepo
             .getJobReadyForStart(
-              settings.maxJobRetries,
-              dateTimeFactory.now,
-              settings.betweenRunAttemptInterval,
+              JobReadyForStartCheckParams(
+                settings.maxJobRetries,
+                dateTimeFactory.now,
+                settings.betweenRunAttemptInterval
+              ),
               settings.supportedWorkerTypes
             )
             .onComplete {
@@ -79,10 +85,10 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
               // maybe db error
               case Failure(e) =>
                 logger.error("can't get job", e)
-                scheduler.scheduleOnce(settings.pauseDurationWhenNoJobs, () => runForever(threadSeqId))
+                scheduler.scheduleOnce(settings.pauseDurationWhenNoJobsRandomized, () => runForever(threadSeqId))
               // no jobs for start
               case _ =>
-                scheduler.scheduleOnce(settings.pauseDurationWhenNoJobs, () => runForever(threadSeqId))
+                scheduler.scheduleOnce(settings.pauseDurationWhenNoJobsRandomized, () => runForever(threadSeqId))
             }
         case _ =>
           logger.info("finishing run loop")
@@ -92,7 +98,10 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
 
     // respect required parallelism
     (1 to settings.parallelism)
-      .foreach(runForever)
+      .foreach {
+        threadSeqId =>
+          scheduler.scheduleOnce(JobDispatcher.jobStartDelay, () => runForever(threadSeqId))
+      }
 
     val maintenanceCancelControl = scheduleMaintenance()
 
@@ -121,7 +130,12 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
 
     val startResult = for {
       worker <- Future(settings.getWorkerByJobType(job.jobType))
-      isStarted <- bgJobRepo.markJobAsStarted(job.id, job.tryCount + 1, dateTimeFactory.now)
+      isStarted <- bgJobRepo.tryMarkJobAsStarted(job.id, job.tryCount + 1, dateTimeFactory.now,
+        JobReadyForStartCheckParams(
+          settings.maxJobRetries,
+          dateTimeFactory.now,
+          settings.betweenRunAttemptInterval
+        ))
     } yield (isStarted, worker)
 
     startResult
@@ -164,4 +178,8 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
           ()
       }
   }
+}
+
+object JobDispatcher {
+  val jobStartDelay: FiniteDuration = 1.milli
 }

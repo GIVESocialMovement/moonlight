@@ -3,7 +3,7 @@ package givers.moonlight.v2
 import akka.actor.Cancellable
 import akka.actor.typed.Scheduler
 import givers.moonlight.util.DateTimeFactory
-import givers.moonlight.v2.repository.BackgroundJobRepository
+import givers.moonlight.v2.repository.{BackgroundJobRepository, JobReadyForStartCheckParams}
 import givers.moonlight.{AsyncSupport, AsyncWorkerSpec, BackgroundJob, Worker, WorkerSpec}
 import helpers.BackgroundJobFixture
 import org.mockito.scalatest.AsyncIdiomaticMockito
@@ -14,9 +14,10 @@ import play.api.inject.Injector
 import play.api.libs.json.{Json, OFormat}
 
 import java.util.Date
-import scala.concurrent.{Future, Promise}
-import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, Future, Promise}
+import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.reflect.{ClassTag, classTag}
+import scala.util.Random
 
 class JobDispatcherSpec
   extends AsyncWordSpecLike
@@ -69,9 +70,18 @@ class JobDispatcherSpec
         jobRunTimeout = 1.second,
         workerSpecs = Seq(Worker1Spec)
       )
-      implicit val injector = mock[Injector]
-      implicit val scheduler = mock[Scheduler]
-      implicit val dateTimeFactory = mock[DateTimeFactory]
+
+      abstract class TestScheduler extends Scheduler {
+        def scheduleOnce(delay: FiniteDuration, runnable: Runnable)(implicit executor: ExecutionContext): Cancellable = {
+          runnable.run()
+          null
+        }
+      }
+
+      implicit val injector: Injector = mock[Injector]
+      implicit val scheduler: Scheduler = mock[TestScheduler]
+      implicit val dateTimeFactory: DateTimeFactory = mock[DateTimeFactory]
+      implicit val random: Random = mock[Random]
       val schedulerCancel = mock[Cancellable]
 
       val dispatcher = new JobDispatcher(repo, settings, dateTimeFactory)
@@ -84,8 +94,10 @@ class JobDispatcherSpec
       // it's needed for proper synchronisation to avoid "wait-based" sync
       val allJobsWereUsed = Promise[Unit]
 
+      scheduler.scheduleOnce(1.milli, *)(*) calls realMethod
+
       // simulates 3+ calls of job retrieving method
-      repo.getJobReadyForStart(3, currentDate, 30.minutes, settings.supportedWorkerTypes)
+      repo.getJobReadyForStart(JobReadyForStartCheckParams(3, currentDate, 30.minutes), settings.supportedWorkerTypes)
         // this job will be completed
         .returns(Future.successful(Some(jobOfType("Worker1", firstId).copy(paramsInJsonString = """{"shouldSucceed": true}"""))))
         // there is no worker for this job so it will just log error
@@ -103,18 +115,19 @@ class JobDispatcherSpec
           Future.successful(None)
         }
 
-      repo.markJobAsStarted(firstId, 1, *) returns Future.successful(true)
-      repo.markJobAsStarted(thirdId, 1, *) returns Future.successful(true)
+      repo.tryMarkJobAsStarted(firstId, 1, *, *) returns Future.successful(true)
+      repo.tryMarkJobAsStarted(thirdId, 1, *, *) returns Future.successful(true)
       // simulate concurrent run.
       // When Future return false it means that the job was picked my other instance of the application
-      repo.markJobAsStarted(fourthId, 1, *) returns Future.successful(false)
+      repo.tryMarkJobAsStarted(fourthId, 1, *, *) returns Future.successful(false)
       repo.markJobAsFailed(secondId, *, *) returns Future.successful(())
       repo.markJobAsFailed(thirdId, *, *) returns Future.successful(())
 
       repo.markJobAsSucceed(firstId, *) returns Future.successful(())
 
       injector.instanceOf[Worker1](classTag[Worker1]) returns new Worker1
-      scheduler.scheduleOnce(1.minute, *)(*) returns null
+      random.between(60000L, 66000L) returns 61000L
+      scheduler.scheduleOnce(61000.millis, *)(*) returns null
 
       val (cancelLoop, loopFuture) = dispatcher.runLoop()
 

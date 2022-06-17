@@ -2,7 +2,6 @@ package givers.moonlight
 
 import java.util.Date
 import java.util.concurrent.atomic.AtomicBoolean
-
 import helpers._
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
@@ -11,6 +10,7 @@ import play.api.inject.Injector
 import utest._
 
 import scala.concurrent.Future
+import scala.util.control.NoStackTrace
 
 object RunSpec extends BaseSpec {
 
@@ -64,7 +64,7 @@ object RunSpec extends BaseSpec {
 
       "Get, run, and fail" - {
         when(work.runJob(any())).thenAnswer(new Answer[Unit] {
-          override def answer(invocation: InvocationOnMock) = throw new Exception("FakeError")
+          override def answer(invocation: InvocationOnMock) = throw new Exception("FakeError") with NoStackTrace
         })
         when(backgroundJobService.get()).thenReturn(Future(Some(job)))
 
@@ -83,7 +83,7 @@ object RunSpec extends BaseSpec {
 
       "Fail too many times" - {
         when(work.runJob(any())).thenAnswer(new Answer[Unit] {
-          override def answer(invocation: InvocationOnMock) = throw new Exception("FakeError")
+          override def answer(invocation: InvocationOnMock) = throw new Exception("FakeError") with NoStackTrace
         })
         when(backgroundJobService.get()).thenReturn(Future(Some(job)))
 
@@ -118,7 +118,7 @@ object RunSpec extends BaseSpec {
 
       "InterruptedException occurs" - {
         when(work.runJob(any())).thenAnswer(new Answer[Unit] {
-          override def answer(invocation: InvocationOnMock) = throw new InterruptedException()
+          override def answer(invocation: InvocationOnMock) = throw new InterruptedException() with NoStackTrace
         })
         when(backgroundJobService.get()).thenReturn(Future(Some(job)))
 
@@ -135,7 +135,7 @@ object RunSpec extends BaseSpec {
       }
 
       "General error occurs" - {
-        when(backgroundJobService.get()).thenReturn(Future.failed(new Exception()))
+        when(backgroundJobService.get()).thenReturn(Future.failed(new Exception() with NoStackTrace))
 
         run.pickAndRunJob(running)
 

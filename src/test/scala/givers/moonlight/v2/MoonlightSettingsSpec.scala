@@ -10,8 +10,9 @@ import play.api.libs.json.{Json, OFormat}
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.reflect.ClassTag
+import scala.util.Random
 
-class MoonlightSettingsSpec extends AnyWordSpecLike with Matchers with IdiomaticMockito{
+class MoonlightSettingsSpec extends AnyWordSpecLike with Matchers with IdiomaticMockito {
   object WorkerSpecExample {
     case class JobData(shouldSucceed: Boolean) extends givers.moonlight.Job
     implicit val jsonFormat: OFormat[JobData] = Json.format[JobData]
@@ -37,7 +38,7 @@ class MoonlightSettingsSpec extends AnyWordSpecLike with Matchers with Idiomatic
     new WorkerSpecExample("w_2", Set("w2"))
   )
 
-  private val settings = MoonlightSettings(1, 0.seconds, 0.seconds, 0.seconds, 1, 0.seconds, workerSpecs)
+  private val settings = MoonlightSettings(1, 3.seconds, 0.seconds, 0.seconds, 1, 0.seconds, workerSpecs)
 
   private implicit val injector: Injector = mock[Injector]
 
@@ -57,6 +58,14 @@ class MoonlightSettingsSpec extends AnyWordSpecLike with Matchers with Idiomatic
       injector.instanceOf[WorkerExample] returns worker
 
       settings.getWorkerByJobType("w1") shouldBe worker
+    }
+  }
+
+  "MoonlightSettings.pauseDurationWhenNoJobsRandomized" should {
+    "return worker" in {
+      implicit val random: Random = mock[Random]
+      random.between(3.seconds.toMillis, 3300L) returns 3100L
+      settings.pauseDurationWhenNoJobsRandomized shouldBe 3100.millis
     }
   }
 }

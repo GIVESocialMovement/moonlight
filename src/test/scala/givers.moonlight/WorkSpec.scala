@@ -1,7 +1,6 @@
 package givers.moonlight
 
 import java.util.Date
-
 import helpers._
 import org.mockito.invocation.InvocationOnMock
 import org.mockito.stubbing.Answer
@@ -10,6 +9,7 @@ import play.api.inject.Injector
 import utest._
 
 import scala.concurrent.Future
+import scala.util.control.NoStackTrace
 
 object WorkSpec extends BaseSpec {
 
@@ -85,7 +85,7 @@ object WorkSpec extends BaseSpec {
 
       "Get, run, and fail" - {
         when(worker.run(any())).thenAnswer(new Answer[Unit] {
-          override def answer(invocation: InvocationOnMock) = throw new Exception("FakeError")
+          override def answer(invocation: InvocationOnMock) = throw new Exception("FakeError") with NoStackTrace
         })
 
         intercept[Exception] {
@@ -103,7 +103,7 @@ object WorkSpec extends BaseSpec {
         val unrecognizedJob = job.copy(id = 1234L, jobType = "ItsUnrecognizedJobType")
         when(backgroundJobService.getById(any())).thenReturn(Future(Some(unrecognizedJob)))
         when(worker.run(any())).thenAnswer(new Answer[Unit] {
-          override def answer(invocation: InvocationOnMock) = throw new Exception("FakeError")
+          override def answer(invocation: InvocationOnMock) = throw new Exception("FakeError") with NoStackTrace
         })
 
         intercept[Exception] {
@@ -117,7 +117,7 @@ object WorkSpec extends BaseSpec {
 
       "InterruptedException occurs" - {
         when(worker.run(any())).thenAnswer(new Answer[Unit] {
-          override def answer(invocation: InvocationOnMock) = throw new InterruptedException()
+          override def answer(invocation: InvocationOnMock) = throw new InterruptedException() with NoStackTrace
         })
         when(backgroundJobService.get()).thenReturn(Future(Some(job)))
 

@@ -2,10 +2,28 @@ package givers.moonlight.v2.repository
 
 import com.google.inject.ImplementedBy
 import givers.moonlight.BackgroundJob
+import givers.moonlight.util.RichDate.RichDate
 
 import java.util.Date
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
+
+/**
+ * Parameters that are needed to check that the job can actually be started
+ *
+ * @param maxAcceptableAttemptsCount "try count" upper bound
+ * @param now current date
+ * @param betweenAttemptInterval how long to wait after a "failed attempt" before trying again
+ *
+ * @return
+ */
+case class JobReadyForStartCheckParams(
+  maxAcceptableAttemptsCount: Int,
+  now: Date,
+  betweenAttemptInterval: FiniteDuration
+) {
+  def lastAttemptAfter: Date = now.sub(betweenAttemptInterval)
+}
 
 /**
  * Background job repository
@@ -36,35 +54,27 @@ trait BackgroundJobRepository {
    * Get pending jobs and jobs that were failed some time ago that still can be retried
    *
    * @param desiredNumberOfJobs desired number of jobs
-   * @param maxAcceptableAttemptsCount "try count" upper bound
-   * @param now current date
-   * @param betweenAttemptInterval how long to wait after a "failed attempt" before trying again
+   * @param checkParams parameters that are needed to check that the job can actually be started
    * @param supportedWorkerTypes supported worker types @see[[givers.moonlight.v2.MoonlightSettings.supportedWorkerTypes]]
    *                             todo get rid of it after full v2 migration
    * @return
    */
   def getJobsReadyForStart(
     desiredNumberOfJobs: Long,
-    maxAcceptableAttemptsCount: Int,
-    now: Date,
-    betweenAttemptInterval: FiniteDuration,
+    checkParams: JobReadyForStartCheckParams,
     supportedWorkerTypes: Seq[String]
   ): Future[Seq[BackgroundJob]]
 
   /**
    * Get top pending job or job that wes failed some time ago that still can be retried
    *
-   * @param maxAcceptableAttemptsCount "try count" upper bound
-   * @param now current date
-   * @param betweenAttemptInterval how long to wait after a "failed attempt" before trying again
+   * @param checkParams parameters that are needed to check that the job can actually be started
    * @param supportedWorkerTypes supported worker types @see[[givers.moonlight.v2.MoonlightSettings.supportedWorkerTypes]]
    *                             todo get rid of it after full v2 migration
    * @return
    */
   def getJobReadyForStart(
-    maxAcceptableAttemptsCount: Int,
-    now: Date,
-    betweenAttemptInterval: FiniteDuration,
+    checkParams: JobReadyForStartCheckParams,
     supportedWorkerTypes: Seq[String]
   ): Future[Option[BackgroundJob]]
 
@@ -87,11 +97,17 @@ trait BackgroundJobRepository {
    * @param bgJobId background job id
    * @param newTryCount updated retry count
    * @param updateDate update date
+   * @param checkParams parameters that are needed to check that the job can actually be started
    * @return future with the result:
    *         true - job is started by this instance
    *         false - job is started by someone else (concurrently)
    */
-  def markJobAsStarted(bgJobId: Long, newTryCount: Int, updateDate: Date): Future[Boolean]
+  def tryMarkJobAsStarted(
+    bgJobId: Long,
+    newTryCount: Int,
+    updateDate: Date,
+    checkParams: JobReadyForStartCheckParams
+  ): Future[Boolean]
 
   /**
    * Change background job status to "Succeeded"
