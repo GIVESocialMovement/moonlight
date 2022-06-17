@@ -41,10 +41,15 @@ class BackgroundJobJdbcRepository @Inject()(
       .map(job => (job.status, job.finishedAtOpt))
   )
 
-  private val markJobAsStartedSelectQuery = Compiled((bgJobId: Rep[Long]) =>
-    backgroundJobs
-      .filter(job => job.id === bgJobId && job.status.inSet(Seq(Status.Pending, Status.Initiated, Status.Failed)))
-      .map(job => (job.status, job.startedAtOpt, job.initiatedAtOpt, job.tryCount))
+  private val markJobAsStartedSelectQuery = Compiled((
+      bgJobId: Rep[Long],
+      maxAcceptableAttemptsCount: Rep[Int],
+      now: Rep[Date],
+      lastAttemptAfter: Rep[Date]
+    ) =>
+      backgroundJobs
+        .filter(job => job.id === bgJobId && jobCanBeStartedConditions(job, maxAcceptableAttemptsCount, now, lastAttemptAfter))
+        .map(job => (job.status, job.startedAtOpt, job.initiatedAtOpt, job.tryCount))
   )
 
   private val maintainExpiredJobsInitiatedQuery = Compiled((upperBoundTime: Rep[Date]) =>
@@ -76,26 +81,45 @@ class BackgroundJobJdbcRepository @Inject()(
   }
 
   /**
+   * Conditions for job to be started
+   *
+   * @param job background job table
+   * @param maxAcceptableAttemptsCount "try count" upper bound
+   * @param now current date
+   * @param lastAttemptAfter when the job after failed finish can be tried again
+   *
+   * @return
+   */
+  private def jobCanBeStartedConditions(
+    job: BackgroundJobTable,
+    maxAcceptableAttemptsCount: Rep[Int],
+    now: Rep[Date],
+    lastAttemptAfter: Rep[Date]
+  ): Rep[Option[Boolean]] = {
+    (job.status === Status.Pending && job.shouldRunAt <= now) ||
+      (job.status === Status.Failed
+        && job.tryCount < maxAcceptableAttemptsCount
+        && job.finishedAtOpt < lastAttemptAfter) // one attempt for some period of time
+  }
+
+  /**
    * @inheritdoc
    */
   override def getJobsReadyForStart(
     desiredNumberOfJobs: Long,
-    maxAcceptableAttemptsCount: Int,
-    now: Date,
-    betweenAttemptInterval: FiniteDuration,
+    checkParams: JobReadyForStartCheckParams,
     supportedWorkerTypes: Seq[String]
   ): Future[Seq[BackgroundJob]] = {
-    val lastAttemptAfter = now.sub(betweenAttemptInterval)
 
     db.run(
       // this request can't be compiled because of inSet
       backgroundJobs
         .filter { job =>
           job.jobType.inSet(supportedWorkerTypes) &&
-          ((job.status === Status.Pending && job.shouldRunAt < now) ||
-            (job.status === Status.Failed
-              && job.tryCount < maxAcceptableAttemptsCount
-              && job.finishedAtOpt < lastAttemptAfter)) // one attempt for some period of time
+            jobCanBeStartedConditions(
+              job, checkParams.maxAcceptableAttemptsCount, checkParams.now, checkParams.lastAttemptAfter
+            )
+
         }
         .sortBy { job => (job.priority.asc, job.createdAt.asc) }
         .take(desiredNumberOfJobs)
@@ -107,13 +131,10 @@ class BackgroundJobJdbcRepository @Inject()(
    * @inheritdoc
    */
   override def getJobReadyForStart(
-    maxAcceptableAttemptsCount: Int,
-    now: Date,
-    betweenAttemptInterval: FiniteDuration,
+    checkParams: JobReadyForStartCheckParams,
     supportedWorkerTypes: Seq[String]
   ): Future[Option[BackgroundJob]] = {
-    getJobsReadyForStart(1, maxAcceptableAttemptsCount, now, betweenAttemptInterval, supportedWorkerTypes)
-      .map(_.headOption)
+    getJobsReadyForStart(1, checkParams, supportedWorkerTypes).map(_.headOption)
   }
 
   /**
@@ -139,10 +160,17 @@ class BackgroundJobJdbcRepository @Inject()(
   /**
    * @inheritdoc
    */
-  override def markJobAsStarted(bgJobId: Long, newTryCount: Int, updateDate: Date): Future[Boolean] = {
+  override def tryMarkJobAsStarted(
+    bgJobId: Long,
+    newTryCount: Int,
+    updateDate: Date,
+    checkParams: JobReadyForStartCheckParams
+  ): Future[Boolean] = {
     db
       .run(
-        markJobAsStartedSelectQuery(bgJobId).update((Status.Started, Some(updateDate), Some(updateDate), newTryCount))
+        markJobAsStartedSelectQuery(
+          bgJobId, checkParams.maxAcceptableAttemptsCount, checkParams.now, checkParams.lastAttemptAfter
+        ).update((Status.Started, Some(updateDate), Some(updateDate), newTryCount))
       )
       .map(_ == 1)
   }

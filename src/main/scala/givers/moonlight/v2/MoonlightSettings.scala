@@ -3,7 +3,8 @@ package givers.moonlight.v2
 import givers.moonlight.{AsyncSupport, AsyncWorkerSpec, Worker}
 import play.api.inject.Injector
 
-import scala.concurrent.duration.FiniteDuration
+import scala.concurrent.duration.{DurationLong, FiniteDuration}
+import scala.util.Random
 
 class WorkerSearchException(msg: String) extends Exception(msg)
 
@@ -32,6 +33,21 @@ case class MoonlightSettings(
   lazy val supportedWorkerTypes: Seq[String] = workerSpecs.flatMap(w => w.previousIdentifiers + w.identifier)
 
   /**
+   * Randomize duration a bit to decrease job concurrency effect
+   * when all threads tries to pick the same job and the log will be spammed with messages like
+   * '... can't be started because it's started by someone else'
+   *
+   * @param random randomizer
+   * @return
+   */
+  def pauseDurationWhenNoJobsRandomized(implicit random: Random): FiniteDuration = {
+    val millis = pauseDurationWhenNoJobs.toMillis
+    val delta = (millis * MoonlightSettings.durationRandomizationBound).toLong
+
+    random.between(millis, millis + delta).millis
+  }
+
+  /**
    * Get worker for a job type
    *
    * @param jobType job type
@@ -51,4 +67,11 @@ case class MoonlightSettings(
             s"Multiple workers ($names) are defined to process this job type.")
       }
   }
+}
+
+object MoonlightSettings {
+  /**
+   * 0 - 1 (0% - 100%) randomization bounds
+   */
+  val durationRandomizationBound = 0.1
 }
