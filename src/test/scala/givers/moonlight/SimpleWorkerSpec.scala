@@ -29,7 +29,9 @@ object SimpleWorkerSpec extends BaseSpec {
     }
 
     "Fail" - {
-      val ex = intercept[Exception] { worker.run(job.copy(paramsInJsonString = """{"data":"error"}""")) }
+      val ex = intercept[Exception] {
+        worker.run(job.copy(paramsInJsonString = """{"data":"error"}"""))
+      }
       assert(ex.getMessage == "FakeError")
     }
   }

@@ -5,8 +5,9 @@ import play.api.inject.Injector
 
 import scala.concurrent.duration.{DurationLong, FiniteDuration}
 import scala.util.Random
+import scala.util.control.NoStackTrace
 
-class WorkerSearchException(msg: String) extends Exception(msg)
+class WorkerSearchException(msg: String) extends Exception(msg) with NoStackTrace
 
 /**
  * Moonlight app settings
@@ -28,10 +29,6 @@ case class MoonlightSettings(
   jobRunTimeout: FiniteDuration,
   workerSpecs: Seq[AsyncWorkerSpec]
 ) {
-  // these types are needed for proper job filter to avoid collision with Moonlight v1
-  //todo get rid of it when all jobs will be transferred to v2
-  lazy val supportedWorkerTypes: Seq[String] = workerSpecs.flatMap(w => w.previousIdentifiers + w.identifier)
-
   /**
    * Randomize duration a bit to decrease job concurrency effect
    * when all threads tries to pick the same job and the log will be spammed with messages like

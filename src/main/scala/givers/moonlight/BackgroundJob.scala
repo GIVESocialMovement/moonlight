@@ -23,8 +23,7 @@ case class BackgroundJob(
 object BackgroundJob {
   object Status extends Enumeration {
     type Status = Value
-    //todo status Initiated looks redundant
-    val Pending, Initiated, Started, Succeeded, Failed = Value
+    val Pending, Started, Succeeded, Failed = Value
   }
 
   def forEnqueue[T <: Job](shouldRunAt: Date, priority: Int, param: T)

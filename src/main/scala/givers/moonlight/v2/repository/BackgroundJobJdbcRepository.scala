@@ -52,12 +52,6 @@ class BackgroundJobJdbcRepository @Inject()(
         .map(job => (job.status, job.startedAtOpt, job.initiatedAtOpt, job.tryCount))
   )
 
-  private val maintainExpiredJobsInitiatedQuery = Compiled((upperBoundTime: Rep[Date]) =>
-    backgroundJobs
-      .filter(job => job.status === Status.Initiated && job.initiatedAtOpt < upperBoundTime)
-      .map(job => (job.status, job.error, job.finishedAtOpt))
-  )
-
   private val maintainExpiredJobsStartedQuery = Compiled((upperBoundTime: Rep[Date]) =>
     backgroundJobs
       .filter(q => q.status === Status.Started && q.startedAtOpt < upperBoundTime)
@@ -76,8 +70,8 @@ class BackgroundJobJdbcRepository @Inject()(
   /**
    * @inheritdoc
    */
-  override def getJobs(skip: Long, take: Long, supportedWorkerTypes: Seq[String]): Future[Seq[BackgroundJob]] = {
-    db.run(backgroundJobs.filter(_.jobType.inSet(supportedWorkerTypes)).sortBy(_.id.desc).drop(skip).take(take).result)
+  override def getJobs(skip: Long, take: Long): Future[Seq[BackgroundJob]] = {
+    db.run(backgroundJobs.sortBy(_.id.desc).drop(skip).take(take).result)
   }
 
   /**
@@ -107,20 +101,15 @@ class BackgroundJobJdbcRepository @Inject()(
    */
   override def getJobsReadyForStart(
     desiredNumberOfJobs: Long,
-    checkParams: JobReadyForStartCheckParams,
-    supportedWorkerTypes: Seq[String]
+    checkParams: JobReadyForStartCheckParams
   ): Future[Seq[BackgroundJob]] = {
 
     db.run(
       // this request can't be compiled because of inSet
       backgroundJobs
-        .filter { job =>
-          job.jobType.inSet(supportedWorkerTypes) &&
-            jobCanBeStartedConditions(
-              job, checkParams.maxAcceptableAttemptsCount, checkParams.now, checkParams.lastAttemptAfter
-            )
-
-        }
+        .filter(
+          jobCanBeStartedConditions(_, checkParams.maxAcceptableAttemptsCount, checkParams.now, checkParams.lastAttemptAfter)
+        )
         .sortBy { job => (job.priority.asc, job.createdAt.asc) }
         .take(desiredNumberOfJobs)
         .result
@@ -131,10 +120,9 @@ class BackgroundJobJdbcRepository @Inject()(
    * @inheritdoc
    */
   override def getJobReadyForStart(
-    checkParams: JobReadyForStartCheckParams,
-    supportedWorkerTypes: Seq[String]
+    checkParams: JobReadyForStartCheckParams
   ): Future[Option[BackgroundJob]] = {
-    getJobsReadyForStart(1, checkParams, supportedWorkerTypes).map(_.headOption)
+    getJobsReadyForStart(1, checkParams).map(_.headOption)
   }
 
   /**
@@ -143,18 +131,9 @@ class BackgroundJobJdbcRepository @Inject()(
   override def maintainExpiredJobs(jobRunTimeout: FiniteDuration, now: Date): Future[Int] = {
     val upperBoundTime = now.sub(jobRunTimeout)
 
-    for {
-      notStarted <- db.run {
-        // this part of the method is deprecated because we don't use Initiated any more
-        // this block is left for compatibility
-        maintainExpiredJobsInitiatedQuery(upperBoundTime)
-          .update((Status.Pending, "Timeout (from Initiated)", Some(now)))
-      }
-      startedButNotFinished <- db.run {
-        maintainExpiredJobsStartedQuery(upperBoundTime)
-          .update((Status.Failed, "Timeout (from Started)", Some(now)))
-      }
-    } yield notStarted + startedButNotFinished
+    db.run {
+      maintainExpiredJobsStartedQuery(upperBoundTime).update((Status.Failed, "Timeout (from Started)", Some(now)))
+    }
   }
 
   /**

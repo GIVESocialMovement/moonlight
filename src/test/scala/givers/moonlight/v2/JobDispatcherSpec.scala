@@ -98,7 +98,7 @@ class JobDispatcherSpec
       scheduler.scheduleOnce(1.milli, *)(*) calls realMethod
 
       // simulates 3+ calls of job retrieving method
-      repo.getJobReadyForStart(JobReadyForStartCheckParams(3, currentDate, 30.minutes), settings.supportedWorkerTypes)
+      repo.getJobReadyForStart(JobReadyForStartCheckParams(3, currentDate, 30.minutes))
         // this job will be completed
         .returns(Future.successful(Some(jobOfType("Worker1", firstId).copy(paramsInJsonString = """{"shouldSucceed": true}"""))))
         // there is no worker for this job so it will just log error
