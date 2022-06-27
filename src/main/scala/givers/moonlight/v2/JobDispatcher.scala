@@ -76,8 +76,7 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
                 settings.maxJobRetries,
                 dateTimeFactory.now,
                 settings.betweenRunAttemptInterval
-              ),
-              settings.supportedWorkerTypes
+              )
             )
             .onComplete {
               case Success(Some(job)) =>

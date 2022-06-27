@@ -17,12 +17,11 @@ import scala.concurrent.ExecutionContext
 @Singleton
 class HomeController @Inject()(
                                 repo: BackgroundJobRepository,
-                                controllerComponents: ControllerComponents,
-                                moonlightSettings: MoonlightSettings
+                                controllerComponents: ControllerComponents
 )(implicit ec: ExecutionContext) extends AbstractController(controllerComponents)  {
 
   def index = Action.async {
-    repo.getJobs(0, 10, moonlightSettings.supportedWorkerTypes).map { jobs =>
+    repo.getJobs(0, 10).map { jobs =>
       Ok(views.html.index(jobs))
     }
   }

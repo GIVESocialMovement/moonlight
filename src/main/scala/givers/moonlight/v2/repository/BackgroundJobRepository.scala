@@ -44,39 +44,29 @@ trait BackgroundJobRepository {
    *
    * @param skip number of skipped records
    * @param take desired number of records
-   * @param supportedWorkerTypes supported worker types @see[[givers.moonlight.v2.MoonlightSettings.supportedWorkerTypes]]
-   *                             todo get rid of it after full v2 migration
    * @return
    */
-  def getJobs(skip: Long, take: Long, supportedWorkerTypes: Seq[String]): Future[Seq[BackgroundJob]]
+  def getJobs(skip: Long, take: Long): Future[Seq[BackgroundJob]]
 
   /**
    * Get pending jobs and jobs that were failed some time ago that still can be retried
    *
    * @param desiredNumberOfJobs desired number of jobs
    * @param checkParams parameters that are needed to check that the job can actually be started
-   * @param supportedWorkerTypes supported worker types @see[[givers.moonlight.v2.MoonlightSettings.supportedWorkerTypes]]
-   *                             todo get rid of it after full v2 migration
    * @return
    */
   def getJobsReadyForStart(
     desiredNumberOfJobs: Long,
-    checkParams: JobReadyForStartCheckParams,
-    supportedWorkerTypes: Seq[String]
+    checkParams: JobReadyForStartCheckParams
   ): Future[Seq[BackgroundJob]]
 
   /**
    * Get top pending job or job that wes failed some time ago that still can be retried
    *
    * @param checkParams parameters that are needed to check that the job can actually be started
-   * @param supportedWorkerTypes supported worker types @see[[givers.moonlight.v2.MoonlightSettings.supportedWorkerTypes]]
-   *                             todo get rid of it after full v2 migration
    * @return
    */
-  def getJobReadyForStart(
-    checkParams: JobReadyForStartCheckParams,
-    supportedWorkerTypes: Seq[String]
-  ): Future[Option[BackgroundJob]]
+  def getJobReadyForStart(checkParams: JobReadyForStartCheckParams): Future[Option[BackgroundJob]]
 
   /**
    * Service requests whose aim is to:

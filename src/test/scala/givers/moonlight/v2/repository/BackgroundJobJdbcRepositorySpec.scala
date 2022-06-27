@@ -73,11 +73,9 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
       for {
         _ <- insertJob(jobExample)
         two <- insertJob(jobExample)
-        // wrong status
-        _ <- insertJob(jobExample.copy(jobType = "other-type"))
         three <- insertJob(jobExample)
         _ <- insertJob(jobExample)
-        jobs <- repo.getJobs(skip = 1, take = 2, Seq("example"))
+        jobs <- repo.getJobs(skip = 1, take = 2)
       } yield {
         jobs.map(_.id) should contain theSameElementsAs Seq(two.id, three.id)
       }
@@ -98,8 +96,6 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
           tryCount = maxAttempts - 1,
           finishedAtOpt = Some(new Date(currentDate.getTime - interval.toMillis - 1)))
         )
-        // wrong type
-        _ <- insertJob(jobExample.copy(jobType = "other-type"))
         // is not supposed to be started now
         _ <- insertJob(jobExample.copy(shouldRunAt = futureDate))
         // max attempts reached
@@ -107,13 +103,11 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
         // was failed a moment ago so for now is not supposed to be restarted
         _ <- insertJob(jobExample.copy(status = Status.Failed))
         // wrong status
-        _ <- insertJob(jobExample.copy(status = Status.Initiated))
-        // wrong status
         _ <- insertJob(jobExample.copy(status = Status.Started))
         // wrong status
         _ <- insertJob(jobExample.copy(status = Status.Succeeded))
-        jobs <- repo.getJobsReadyForStart(3, JobReadyForStartCheckParams(maxAttempts, currentDate, interval), Seq("example"))
-        topJob <- repo.getJobReadyForStart(JobReadyForStartCheckParams(maxAttempts, currentDate, interval), Seq("example"))
+        jobs <- repo.getJobsReadyForStart(3, JobReadyForStartCheckParams(maxAttempts, currentDate, interval))
+        topJob <- repo.getJobReadyForStart(JobReadyForStartCheckParams(maxAttempts, currentDate, interval))
       } yield {
         jobs shouldBe Seq(okToStart, okToRestart)
         topJob shouldBe Some(okToStart)
@@ -130,7 +124,7 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
         fourth <- insertJob(jobExample.copy(priority = 2, createdAt = aBitLater))
         // status is not important
         third <- insertJob(jobExample.copy(priority = 2, createdAt = now, status = Status.Failed, finishedAtOpt = Some(now)))
-        jobs <- repo.getJobsReadyForStart(4, JobReadyForStartCheckParams(1, aBitLater, 0.second), Seq("example"))
+        jobs <- repo.getJobsReadyForStart(4, JobReadyForStartCheckParams(1, aBitLater, 0.second))
       } yield {
         jobs.map(_.id) shouldBe Seq(first, second, third, fourth).map(_.id)
       }
@@ -143,20 +137,16 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
       val timeoutForSub = timeout + 100.milli
 
       for {
-        first <- insertJob(jobExample.copy(status = Status.Initiated, initiatedAtOpt = Some(nowDate.sub(timeoutForSub))))
-        second <- insertJob(jobExample.copy(status = Status.Initiated))
-        third <- insertJob(jobExample.copy(status = Status.Started, startedAtOpt = Some(nowDate.sub(timeoutForSub))))
-        fourth <- insertJob(jobExample.copy(status = Status.Started))
+        first <- insertJob(jobExample.copy(status = Status.Started, startedAtOpt = Some(nowDate.sub(timeoutForSub))))
+        second <- insertJob(jobExample.copy(status = Status.Started))
         changedJobs <- repo.maintainExpiredJobs(timeout, nowDate)
         dbContent <- db.run(tables.backgroundJobs.result)
       } yield {
-        changedJobs shouldBe 2
+        changedJobs shouldBe 1
 
         dbContent.map(_.copy(error = "")) should contain theSameElementsAs Seq(
-          first.copy(status = Status.Pending, finishedAtOpt = Some(nowDate)),
-          second,
-          third.copy(status = Status.Failed, finishedAtOpt = Some(nowDate)),
-          fourth
+          first.copy(status = Status.Failed, finishedAtOpt = Some(nowDate)),
+          second
         )
       }
     }
@@ -214,18 +204,15 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
         for {
           alreadyStarted <- insertJob(jobExample.copy(status = Status.Started, startedAtOpt = Some(updateDate)))
           alreadySucceeded <- insertJob(jobExample.copy(status = Status.Succeeded, startedAtOpt = Some(updateDate)))
-          alreadyInitiated <- insertJob(jobExample.copy(status = Status.Initiated, startedAtOpt = Some(updateDate)))
           dummy <- insertJob(jobExample.copy(status = Status.Started, startedAtOpt = Some(updateDate)))
           alreadyStartedIsChanged <- repo.tryMarkJobAsStarted(alreadyStarted.id, 1, updateDate, JobReadyForStartCheckParams(1, nowDate, 1.minute))
           alreadySucceededIsChanged <- repo.tryMarkJobAsStarted(alreadySucceeded.id, 1, updateDate, JobReadyForStartCheckParams(1, nowDate, 1.minute))
-          alreadyInitiatedIsChanged <- repo.tryMarkJobAsStarted(alreadyInitiated.id, 1, updateDate, JobReadyForStartCheckParams(1, nowDate, 1.minute))
           dbContent <- db.run(tables.backgroundJobs.result)
         } yield {
           alreadyStartedIsChanged shouldBe false
           alreadySucceededIsChanged shouldBe false
-          alreadyInitiatedIsChanged shouldBe false
 
-          dbContent should contain theSameElementsAs Seq(alreadyStarted, alreadySucceeded, alreadyInitiated, dummy)
+          dbContent should contain theSameElementsAs Seq(alreadyStarted, alreadySucceeded, dummy)
         }
       }
 
