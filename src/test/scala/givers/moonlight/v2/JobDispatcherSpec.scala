@@ -18,6 +18,7 @@ import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.reflect.{ClassTag, classTag}
 import scala.util.Random
+import scala.util.control.NoStackTrace
 
 class JobDispatcherSpec
   extends AsyncWordSpecLike
@@ -32,11 +33,11 @@ class JobDispatcherSpec
     type Data = JobData
     type Runner = Worker1
 
-    implicit val classTag = ClassTag(classOf[Worker1])
+    implicit val classTag: ClassTag[Runner] = ClassTag(classOf[Worker1])
     implicit val jsonFormat: OFormat[JobData] = Json.format[JobData]
 
     val identifier = "Worker1"
-    val previousIdentifiers = Set.empty
+    val previousIdentifiers: Set[String] = Set.empty
   }
 
   class Worker1() extends Worker[Worker1Spec.JobData] with AsyncSupport[Worker1Spec.JobData] {
@@ -44,7 +45,7 @@ class JobDispatcherSpec
 
     override def runAsync(job: BackgroundJob, data: Worker1Spec.JobData): Future[Unit] = {
       Option.when(data.shouldSucceed)(())
-        .fold(Future.failed[Unit](new Exception("worker failure example")))(_ => Future.successful(()))
+        .fold(Future.failed[Unit](new Exception("worker failure example") with NoStackTrace))(_ => Future.successful(()))
     }
   }
 

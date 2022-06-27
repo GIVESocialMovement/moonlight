@@ -17,7 +17,7 @@ import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.util.{Failure, Random, Success}
 
-class JobExecutionError(realCause: Throwable) extends Exception("Job execution error", realCause)
+case class JobExecutionError(realCause: Throwable) extends Exception("Job execution error", realCause)
 
 @Singleton
 /**
@@ -158,11 +158,11 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
               logger.info(s"#$threadSeqId job ${job.id} took $duration millis")
           }
 
-          runFuture.recover(e => throw new JobExecutionError(e))
+          runFuture.recover(e => throw JobExecutionError(e))
       }
       // this "recover" will try to mark job as failed
       .recoverWith {
-        case e: JobExecutionError =>
+        case JobExecutionError(e) =>
           logger.error(s"#$threadSeqId error occurred while running the job " +
             s"(id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}, tryCount=${job.tryCount}).", e)
           bgJobRepo.markJobAsFailed(job.id, e, dateTimeFactory.now)
