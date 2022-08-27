@@ -5,13 +5,14 @@ import akka.actor.typed.Scheduler
 import com.google.inject.Singleton
 import givers.moonlight.BackgroundJob
 import givers.moonlight.util.DateTimeFactory
+import givers.moonlight.util.RichDate._
 import givers.moonlight.util.RichFuture.TimeoutAwareFuture
-import givers.moonlight.v2.repository.{BackgroundJobRepository, JobReadyForStartCheckParams}
+import givers.moonlight.v2.repository.BackgroundJobRepository
 import play.api.Logger
 import play.api.inject.Injector
 
 import java.time.Instant
-import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import javax.inject.Inject
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
@@ -58,6 +59,22 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
   }
 
   /**
+   * Get job that can be started now.
+   * First checks pending jobs, if there is no any then checks failed jobs that can be retried
+   *
+   * @return
+   */
+  private def getJobReadyForStart: Future[Option[BackgroundJob]] = {
+    val now = dateTimeFactory.now
+    val lastAttemptAfter = now.sub(settings.betweenRunAttemptInterval)
+
+    bgJobRepo.getPendingJobReadyForStart(now).flatMap {
+      case None => bgJobRepo.getFailedJobReadyForRetry(settings.maxJobRetries, lastAttemptAfter)
+      case res => Future.successful(res)
+    }
+  }
+
+  /**
    * Dispatcher main loop
    * Picks tasks and runs it, pauses if no tasks
    * 
@@ -67,31 +84,30 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
     val runPromise = Promise[Unit]
     val untilRunning = new AtomicBoolean(true)
 
+    // the idea is to complete runPromise only when last worker is closed
+    val workersLeft = new AtomicInteger(settings.parallelism)
+
     def runForever(threadSeqId: Int): Unit = {
       Option.when(untilRunning.get())(()) match {
         case Some(_) =>
-          bgJobRepo
-            .getJobReadyForStart(
-              JobReadyForStartCheckParams(
-                settings.maxJobRetries,
-                dateTimeFactory.now,
-                settings.betweenRunAttemptInterval
-              )
-            )
-            .onComplete {
-              case Success(Some(job)) =>
-                runJob(job, threadSeqId).foreach(_ => runForever(threadSeqId))
-              // maybe db error
-              case Failure(e) =>
-                logger.error("can't get job", e)
-                scheduler.scheduleOnce(settings.pauseDurationWhenNoJobsRandomized, () => runForever(threadSeqId))
-              // no jobs for start
-              case _ =>
-                scheduler.scheduleOnce(settings.pauseDurationWhenNoJobsRandomized, () => runForever(threadSeqId))
-            }
+          getJobReadyForStart
+          .onComplete {
+            case Success(Some(job)) =>
+              runJob(job, threadSeqId).foreach(_ => runForever(threadSeqId))
+            // maybe db error
+            case Failure(e) =>
+              logger.error("can't get job", e)
+              scheduler.scheduleOnce(settings.pauseDurationWhenNoJobsRandomized, () => runForever(threadSeqId))
+            // no jobs for start
+            case _ =>
+              scheduler.scheduleOnce(settings.pauseDurationWhenNoJobsRandomized, () => runForever(threadSeqId))
+          }
         case _ =>
-          logger.info("finishing run loop")
-          runPromise.success(())
+          logger.info(s"$threadSeqId closing worker")
+          if(workersLeft.decrementAndGet() == 0) {
+            logger.info(s"$threadSeqId finishing run loop")
+            runPromise.trySuccess(())
+          }
       }
     }
 
@@ -129,12 +145,14 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
 
     val startResult = for {
       worker <- Future(settings.getWorkerByJobType(job.jobType))
-      isStarted <- bgJobRepo.tryMarkJobAsStarted(job.id, job.tryCount + 1, dateTimeFactory.now,
-        JobReadyForStartCheckParams(
-          settings.maxJobRetries,
-          dateTimeFactory.now,
-          settings.betweenRunAttemptInterval
-        ))
+      isStarted <- bgJobRepo.tryMarkJobAsStarted(
+        job.id,
+        job.tryCount + 1,
+        dateTimeFactory.now,
+        settings.maxJobRetries,
+        dateTimeFactory.now,
+        settings.betweenRunAttemptInterval
+      )
     } yield (isStarted, worker)
 
     startResult

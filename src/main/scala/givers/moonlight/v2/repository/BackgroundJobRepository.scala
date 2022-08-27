@@ -2,28 +2,10 @@ package givers.moonlight.v2.repository
 
 import com.google.inject.ImplementedBy
 import givers.moonlight.BackgroundJob
-import givers.moonlight.util.RichDate.RichDate
 
 import java.util.Date
 import scala.concurrent.Future
 import scala.concurrent.duration.FiniteDuration
-
-/**
- * Parameters that are needed to check that the job can actually be started
- *
- * @param maxAcceptableAttemptsCount "try count" upper bound
- * @param now current date
- * @param betweenAttemptInterval how long to wait after a "failed attempt" before trying again
- *
- * @return
- */
-case class JobReadyForStartCheckParams(
-  maxAcceptableAttemptsCount: Int,
-  now: Date,
-  betweenAttemptInterval: FiniteDuration
-) {
-  def lastAttemptAfter: Date = now.sub(betweenAttemptInterval)
-}
 
 /**
  * Background job repository
@@ -49,24 +31,21 @@ trait BackgroundJobRepository {
   def getJobs(skip: Long, take: Long): Future[Seq[BackgroundJob]]
 
   /**
-   * Get pending jobs and jobs that were failed some time ago that still can be retried
+   * Get top pending job
    *
-   * @param desiredNumberOfJobs desired number of jobs
-   * @param checkParams parameters that are needed to check that the job can actually be started
+   * @param now now date
    * @return
    */
-  def getJobsReadyForStart(
-    desiredNumberOfJobs: Long,
-    checkParams: JobReadyForStartCheckParams
-  ): Future[Seq[BackgroundJob]]
+  def getPendingJobReadyForStart(now: Date): Future[Option[BackgroundJob]]
 
   /**
-   * Get top pending job or job that wes failed some time ago that still can be retried
+   * Get top job that wes failed some time ago that still can be retried
    *
-   * @param checkParams parameters that are needed to check that the job can actually be started
+   * @param maxAcceptableAttemptsCount "try count" upper bound
+   * @param lastAttemptAfter at least when should be the last attempt
    * @return
    */
-  def getJobReadyForStart(checkParams: JobReadyForStartCheckParams): Future[Option[BackgroundJob]]
+  def getFailedJobReadyForRetry(maxAcceptableAttemptsCount: Int, lastAttemptAfter: Date): Future[Option[BackgroundJob]]
 
   /**
    * Service requests whose aim is to:
@@ -87,7 +66,9 @@ trait BackgroundJobRepository {
    * @param bgJobId background job id
    * @param newTryCount updated retry count
    * @param updateDate update date
-   * @param checkParams parameters that are needed to check that the job can actually be started
+   * @param maxAcceptableAttemptsCount "try count" upper bound
+   * @param now current date
+   * @param betweenAttemptInterval how long to wait after a "failed attempt" before trying again
    * @return future with the result:
    *         true - job is started by this instance
    *         false - job is started by someone else (concurrently)
@@ -96,7 +77,9 @@ trait BackgroundJobRepository {
     bgJobId: Long,
     newTryCount: Int,
     updateDate: Date,
-    checkParams: JobReadyForStartCheckParams
+    maxAcceptableAttemptsCount: Int,
+    now: Date,
+    betweenAttemptInterval: FiniteDuration
   ): Future[Boolean]
 
   /**
