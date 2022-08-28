@@ -55,6 +55,8 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
     priority = priority
   )
 
+  private val failedJobExample = jobExample.copy(status = Status.Failed)
+
   "BackgroundJobJdbcRepository.enqueue" should {
     "enqueue a job" in {
       for {
@@ -82,34 +84,26 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
     }
   }
 
-  "BackgroundJobJdbcRepository.getJobsReadyForStart" should {
-    "get jobs considering select conditions" in {
+  "BackgroundJobJdbcRepository.getPendingJobReadyForStart" should {
+    "get job considering select conditions" in {
       val maxAttempts = 3
-      val interval = 1.minute
       val currentDate = nowDate.add(1.milli) // after nowDate
       val futureDate = nowDate.add(10.milli)
 
       for {
         okToStart <- insertJob(jobExample)
-        okToRestart <- insertJob(jobExample.copy(
-          status = Status.Failed,
-          tryCount = maxAttempts - 1,
-          finishedAtOpt = Some(new Date(currentDate.getTime - interval.toMillis - 1)))
-        )
         // is not supposed to be started now
         _ <- insertJob(jobExample.copy(shouldRunAt = futureDate))
         // max attempts reached
-        _ <- insertJob(jobExample.copy(status = Status.Failed, tryCount = maxAttempts))
+        _ <- insertJob(failedJobExample.copy(tryCount = maxAttempts))
         // was failed a moment ago so for now is not supposed to be restarted
-        _ <- insertJob(jobExample.copy(status = Status.Failed))
+        _ <- insertJob(failedJobExample)
         // wrong status
         _ <- insertJob(jobExample.copy(status = Status.Started))
         // wrong status
         _ <- insertJob(jobExample.copy(status = Status.Succeeded))
-        jobs <- repo.getJobsReadyForStart(3, JobReadyForStartCheckParams(maxAttempts, currentDate, interval))
-        topJob <- repo.getJobReadyForStart(JobReadyForStartCheckParams(maxAttempts, currentDate, interval))
+        topJob <- repo.getPendingJobReadyForStart(currentDate)
       } yield {
-        jobs shouldBe Seq(okToStart, okToRestart)
         topJob shouldBe Some(okToStart)
       }
     }
@@ -119,14 +113,66 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
       val aBitLater = nowDate.add(2.milli)
 
       for {
+        _ <- insertJob(jobExample.copy(priority = 2, createdAt = aBitLater))
+        third <- insertJob(jobExample.copy(priority = 2, createdAt = now, finishedAtOpt = Some(now)))
+        firstJobResult <- repo.getPendingJobReadyForStart(aBitLater)
         second <- insertJob(jobExample.copy(priority = 1, createdAt = aBitLater))
+        secondJobResult <- repo.getPendingJobReadyForStart(aBitLater)
         first <- insertJob(jobExample.copy(priority = 1, createdAt = now))
-        fourth <- insertJob(jobExample.copy(priority = 2, createdAt = aBitLater))
-        // status is not important
-        third <- insertJob(jobExample.copy(priority = 2, createdAt = now, status = Status.Failed, finishedAtOpt = Some(now)))
-        jobs <- repo.getJobsReadyForStart(4, JobReadyForStartCheckParams(1, aBitLater, 0.second))
+        thirdJobResult <- repo.getPendingJobReadyForStart(aBitLater)
       } yield {
-        jobs.map(_.id) shouldBe Seq(first, second, third, fourth).map(_.id)
+        firstJobResult.map(_.id) shouldBe Some(third.id)
+        secondJobResult.map(_.id) shouldBe Some(second.id)
+        thirdJobResult.map(_.id) shouldBe Some(first.id)
+      }
+    }
+  }
+
+  "BackgroundJobJdbcRepository.getFailedJobReadyForRetry" should {
+    "get job considering select conditions" in {
+      val maxAttempts = 3
+      val interval = 1.minute
+      val currentDate = nowDate.add(1.milli) // after nowDate
+      val futureDate = nowDate.add(10.milli)
+
+      for {
+        okToRestart <- insertJob(jobExample.copy(
+          status = Status.Failed,
+          tryCount = maxAttempts - 1,
+          finishedAtOpt = Some(new Date(currentDate.getTime - interval.toMillis - 1)))
+        )
+        // is not supposed to be started now
+        _ <- insertJob(jobExample.copy(shouldRunAt = futureDate))
+        // max attempts reached
+        _ <- insertJob(failedJobExample.copy(tryCount = maxAttempts))
+        // was failed a moment ago so for now is not supposed to be restarted
+        _ <- insertJob(failedJobExample)
+        // wrong status
+        _ <- insertJob(jobExample.copy(status = Status.Started))
+        // wrong status
+        _ <- insertJob(jobExample.copy(status = Status.Succeeded))
+        topJob <- repo.getFailedJobReadyForRetry(maxAttempts, currentDate.sub(interval))
+      } yield {
+        topJob shouldBe Some(okToRestart)
+      }
+    }
+
+    "get jobs in right order" in {
+      val now = nowDate.add(1.milli)
+      val aBitLater = nowDate.add(2.milli)
+
+      for {
+        _ <- insertJob(failedJobExample.copy(priority = 2, createdAt = now))
+        first <- insertJob(failedJobExample.copy(priority = 2, createdAt = now, finishedAtOpt = Some(now)))
+        firstJobResult <- repo.getFailedJobReadyForRetry(2, aBitLater)
+        _ <- insertJob(failedJobExample.copy(priority = 2, createdAt = aBitLater, finishedAtOpt = Some(now)))
+        secondJobResult <- repo.getFailedJobReadyForRetry(1, aBitLater)
+        third <- insertJob(failedJobExample.copy(priority = 1, createdAt = now, finishedAtOpt = Some(now)))
+        thirdJobResult <- repo.getFailedJobReadyForRetry(1, aBitLater)
+      } yield {
+        firstJobResult.map(_.id) shouldBe Some(first.id)
+        secondJobResult.map(_.id) shouldBe Some(first.id)
+        thirdJobResult.map(_.id) shouldBe Some(third.id)
       }
     }
   }
@@ -158,7 +204,7 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
       for {
         first <- insertJob(jobExample)
         dummy <- insertJob(jobExample)
-        isChanged <- repo.tryMarkJobAsStarted(first.id, 1, updateDate, JobReadyForStartCheckParams(1, nowDate, 1.minute))
+        isChanged <- repo.tryMarkJobAsStarted(first.id, 1, updateDate, 1, nowDate, 1.minute)
         dbContent <- db.run(tables.backgroundJobs.result)
       } yield {
         isChanged shouldBe true
@@ -178,9 +224,9 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
     "change job status to started if it is failed, tries are available, and required delay is reached" in {
       val updateDate = nowDate.add(1.minute)
       for {
-        first <- insertJob(jobExample.copy(status = Status.Failed, tryCount = 98, finishedAtOpt = Some(nowDate.sub(61.seconds))))
+        first <- insertJob(failedJobExample.copy(tryCount = 98, finishedAtOpt = Some(nowDate.sub(61.seconds))))
         dummy <- insertJob(jobExample)
-        isChanged <- repo.tryMarkJobAsStarted(first.id, 1, updateDate, JobReadyForStartCheckParams(99, nowDate, 1.minute))
+        isChanged <- repo.tryMarkJobAsStarted(first.id, 1, updateDate, 99, nowDate, 1.minute)
         dbContent <- db.run(tables.backgroundJobs.result)
       } yield {
         isChanged shouldBe true
@@ -205,8 +251,8 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
           alreadyStarted <- insertJob(jobExample.copy(status = Status.Started, startedAtOpt = Some(updateDate)))
           alreadySucceeded <- insertJob(jobExample.copy(status = Status.Succeeded, startedAtOpt = Some(updateDate)))
           dummy <- insertJob(jobExample.copy(status = Status.Started, startedAtOpt = Some(updateDate)))
-          alreadyStartedIsChanged <- repo.tryMarkJobAsStarted(alreadyStarted.id, 1, updateDate, JobReadyForStartCheckParams(1, nowDate, 1.minute))
-          alreadySucceededIsChanged <- repo.tryMarkJobAsStarted(alreadySucceeded.id, 1, updateDate, JobReadyForStartCheckParams(1, nowDate, 1.minute))
+          alreadyStartedIsChanged <- repo.tryMarkJobAsStarted(alreadyStarted.id, 1, updateDate, 1, nowDate, 1.minute)
+          alreadySucceededIsChanged <- repo.tryMarkJobAsStarted(alreadySucceeded.id, 1, updateDate, 1, nowDate, 1.minute)
           dbContent <- db.run(tables.backgroundJobs.result)
         } yield {
           alreadyStartedIsChanged shouldBe false
@@ -221,7 +267,7 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
         for {
           pending <- insertJob(jobExample.copy(shouldRunAt = updateDate))
           dummy <- insertJob(jobExample)
-          isChanged <- repo.tryMarkJobAsStarted(pending.id, 1, updateDate, JobReadyForStartCheckParams(1, nowDate, 1.minute))
+          isChanged <- repo.tryMarkJobAsStarted(pending.id, 1, updateDate, 1, nowDate, 1.minute)
           dbContent <- db.run(tables.backgroundJobs.result)
         } yield {
           isChanged shouldBe false
@@ -233,36 +279,37 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
       "job is failed and max try limit is reached" in {
         val updateDate = nowDate.add(1.minute)
         for {
-          failed <- insertJob(jobExample.copy(status = Status.Failed, tryCount = 100))
+          failed <- insertJob(failedJobExample.copy(tryCount = 100))
           dummy <- insertJob(jobExample)
-          isChanged <- repo.tryMarkJobAsStarted(failed.id, 1, updateDate, JobReadyForStartCheckParams(99, nowDate, 1.minute))
+          isChanged <- repo.tryMarkJobAsStarted(failed.id, 1, updateDate, 99, nowDate, 1.minute)
           dbContent <- db.run(tables.backgroundJobs.result)
         } yield {
           isChanged shouldBe false
 
-          dbContent should contain theSameElementsAs Seq(pending, dummy)
+          dbContent should contain theSameElementsAs Seq(failed, dummy)
         }
       }
 
       "job is failed but no required delay is reached" in {
         val updateDate = nowDate.add(1.minute)
         for {
-          failed <- insertJob(jobExample.copy(status = Status.Failed, finishedAtOpt = Some(nowDate.sub(59.seconds))))
+          failed <- insertJob(failedJobExample.copy(finishedAtOpt = Some(nowDate.sub(59.seconds))))
           dummy <- insertJob(jobExample)
-          isChanged <- repo.tryMarkJobAsStarted(failed.id, 1, updateDate, JobReadyForStartCheckParams(1, nowDate, 1.minute))
+          isChanged <- repo.tryMarkJobAsStarted(failed.id, 1, updateDate, 1, nowDate, 1.minute)
           dbContent <- db.run(tables.backgroundJobs.result)
         } yield {
           isChanged shouldBe false
 
-          dbContent should contain theSameElementsAs Seq(pending, dummy)
+          dbContent should contain theSameElementsAs Seq(failed, dummy)
         }
       }
+
       "job is already succeeded" in {
         val updateDate = nowDate.add(1.minute)
 
         for {
           first <- insertJob(jobExample.copy(status = Status.Succeeded, startedAtOpt = Some(updateDate)))
-          isChanged <- repo.tryMarkJobAsStarted(first.id, 1, updateDate, JobReadyForStartCheckParams(1, nowDate, 1.minute))
+          isChanged <- repo.tryMarkJobAsStarted(first.id, 1, updateDate, 1, nowDate, 1.minute)
           dbContent <- db.run(tables.backgroundJobs.result)
         } yield {
           isChanged shouldBe false

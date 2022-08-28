@@ -3,7 +3,8 @@ package givers.moonlight.v2
 import akka.actor.Cancellable
 import akka.actor.typed.Scheduler
 import givers.moonlight.util.DateTimeFactory
-import givers.moonlight.v2.repository.{BackgroundJobRepository, JobReadyForStartCheckParams}
+import givers.moonlight.util.RichDate.RichDate
+import givers.moonlight.v2.repository.BackgroundJobRepository
 import givers.moonlight.{AsyncSupport, AsyncWorkerSpec, BackgroundJob, Worker, WorkerSpec}
 import helpers.BackgroundJobFixture
 import org.mockito.scalatest.AsyncIdiomaticMockito
@@ -20,12 +21,7 @@ import scala.reflect.{ClassTag, classTag}
 import scala.util.Random
 import scala.util.control.NoStackTrace
 
-class JobDispatcherSpec
-  extends AsyncWordSpecLike
-  with Matchers
-  with AsyncIdiomaticMockito
-  with BackgroundJobFixture {
-
+class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdiomaticMockito with BackgroundJobFixture {
 
   object Worker1Spec extends WorkerSpec with AsyncWorkerSpec {
     case class JobData(shouldSucceed: Boolean) extends givers.moonlight.Job
@@ -44,11 +40,13 @@ class JobDispatcherSpec
     def run(param: Worker1Spec.JobData, job: BackgroundJob): Unit = ()
 
     override def runAsync(job: BackgroundJob, data: Worker1Spec.JobData): Future[Unit] = {
-      Option.when(data.shouldSucceed)(())
-        .fold(Future.failed[Unit](new Exception("worker failure example") with NoStackTrace))(_ => Future.successful(()))
+      Option
+        .when(data.shouldSucceed)(())
+        .fold(Future.failed[Unit](new Exception("worker failure example") with NoStackTrace))(_ =>
+          Future.successful(())
+        )
     }
   }
-
 
   "JobDispatcher.runLoop" should {
     "run jobs" in {
@@ -73,7 +71,9 @@ class JobDispatcherSpec
       )
 
       abstract class TestScheduler extends Scheduler {
-        def scheduleOnce(delay: FiniteDuration, runnable: Runnable)(implicit executor: ExecutionContext): Cancellable = {
+        def scheduleOnce(delay: FiniteDuration, runnable: Runnable)(implicit
+          executor: ExecutionContext
+        ): Cancellable = {
           runnable.run()
           null
         }
@@ -98,29 +98,58 @@ class JobDispatcherSpec
       scheduler.scheduleOnce(1.milli, *)(*) calls realMethod
 
       // simulates 3+ calls of job retrieving method
-      repo.getJobReadyForStart(JobReadyForStartCheckParams(3, currentDate, 30.minutes))
+      repo
+        .getPendingJobReadyForStart(currentDate)
         // this job will be completed
-        .returns(Future.successful(Some(jobOfType("Worker1", firstId).copy(paramsInJsonString = """{"shouldSucceed": true}"""))))
+        .returns(
+          Future.successful(
+            Some(
+              jobOfType("Worker1", firstId)
+                .copy(paramsInJsonString = """{"shouldSucceed": true}""")
+            )
+          )
+        )
         // there is no worker for this job so it will just log error
         .andThen(Future.successful(Some(jobOfType("Worker2", secondId))))
+        .andThenAnswer {
+          Future.successful(None)
+        }
+
+      // after getPendingJobReadyForStart returns None dispatcher will call getFailedJobReadyForRetry
+      repo
+        .getFailedJobReadyForRetry(3, currentDate.sub(30.minutes))
         // this job will fail because of param
-        .andThen(Future.successful(Some(jobOfType("Worker1", thirdId).copy(paramsInJsonString = """{"shouldSucceed": false}"""))))
+        .returns(
+          Future.successful(
+            Some(
+              jobOfType("Worker1", thirdId)
+                .copy(paramsInJsonString = """{"shouldSucceed": false}""")
+            )
+          )
+        )
         // this job will be skipped because of concurrency simulation
-        .andThen(Future.successful(Some(jobOfType("Worker1", fourthId).copy(paramsInJsonString = """{"shouldSucceed": false}"""))))
+        .andThen(
+          Future.successful(
+            Some(
+              jobOfType("Worker1", fourthId)
+                .copy(paramsInJsonString = """{"shouldSucceed": false}""")
+            )
+          )
+        )
         // no more jobs
         .andThenAnswer {
-          if(!allJobsWereUsed.isCompleted) {
+          if (!allJobsWereUsed.isCompleted) {
             allJobsWereUsed.success(())
           }
 
           Future.successful(None)
         }
 
-      repo.tryMarkJobAsStarted(firstId, 1, *, *) returns Future.successful(true)
-      repo.tryMarkJobAsStarted(thirdId, 1, *, *) returns Future.successful(true)
+      repo.tryMarkJobAsStarted(firstId, 1, *, *, *, *) returns Future.successful(true)
+      repo.tryMarkJobAsStarted(thirdId, 1, *, *, *, *) returns Future.successful(true)
       // simulate concurrent run.
-      // When Future return false it means that the job was picked my other instance of the application
-      repo.tryMarkJobAsStarted(fourthId, 1, *, *) returns Future.successful(false)
+      // When Future return false it means that the job was picked by other instance of the application
+      repo.tryMarkJobAsStarted(fourthId, 1, *, *, *, *) returns Future.successful(false)
       repo.markJobAsFailed(secondId, *, *) returns Future.successful(())
       repo.markJobAsFailed(thirdId, *, *) returns Future.successful(())
 
@@ -128,7 +157,7 @@ class JobDispatcherSpec
 
       injector.instanceOf[Worker1](classTag[Worker1]) returns new Worker1
       random.between(60000L, 66000L) returns 61000L
-      scheduler.scheduleOnce(61000.millis, *)(*) returns null
+      scheduler.scheduleOnce(61000.millis, *)(*) calls realMethod
 
       val (cancelLoop, loopFuture) = dispatcher.runLoop()
 
