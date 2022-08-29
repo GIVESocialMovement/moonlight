@@ -3,10 +3,10 @@ lazy val moonlight = project in file(".")
 scalaVersion := "2.13.8"
 
 libraryDependencies ++= Seq(
-  "com.typesafe.play" %% "play-slick" % "5.0.0" withSources() withJavadoc(),
-  "com.typesafe.play" %% "play-guice" % "2.8.2" withSources() withJavadoc(),
+  "com.typesafe.play" %% "play-slick" % "5.0.0" withSources () withJavadoc (),
+  "com.typesafe.play" %% "play-guice" % "2.8.2" withSources () withJavadoc (),
   "com.google.inject" % "guice" % "5.1.0",
-  "org.postgresql" % "postgresql" % "42.2.14" withSources() withJavadoc(),
+  "org.postgresql" % "postgresql" % "42.2.14" withSources () withJavadoc (),
   "com.typesafe.play" %% "play-json" % "2.8.1",
   "io.netty" % "netty-common" % "4.1.76.Final",
   "com.typesafe.play" %% "play-slick-evolutions" % "5.0.0" % Test,
@@ -22,7 +22,7 @@ organization := "io.github.givesocialmovement"
 
 name := "play-moonlight"
 
-version := "0.18.0"
+version := "0.19.0"
 
 Test / parallelExecution := false
 
@@ -44,7 +44,7 @@ scmInfo := Some(
 )
 
 developers := List(
-  Developer(id="tanin", name="tanin", email="developers@giveasia.org", url=url("https://github.com/tanin47"))
+  Developer(id = "tanin", name = "tanin", email = "developers@giveasia.org", url = url("https://github.com/tanin47"))
 )
 
 licenses := Seq(("MIT", url("http://opensource.org/licenses/MIT")))
