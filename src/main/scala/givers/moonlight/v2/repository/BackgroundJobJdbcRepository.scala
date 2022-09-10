@@ -75,11 +75,6 @@ class BackgroundJobJdbcRepository @Inject() (
   private val failedJobReadyForRetry = Compiled((maxAcceptableAttemptsCount: Rep[Int], lastAttemptAfter: Rep[Date]) =>
     backgroundJobs
       .filter(jobsReadyForRetryConditions(_, maxAcceptableAttemptsCount, lastAttemptAfter))
-      .filter { job =>
-        job.status === Status.Failed &&
-        job.tryCount < maxAcceptableAttemptsCount &&
-        job.finishedAtOpt < lastAttemptAfter // one attempt for some period of time
-      }
       .sortBy(job => (job.priority.asc, job.createdAt.asc))
       .take(1)
   )
