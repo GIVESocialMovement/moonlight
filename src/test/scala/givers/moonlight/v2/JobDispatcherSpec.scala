@@ -14,6 +14,7 @@ import org.scalatest.wordspec.AsyncWordSpecLike
 import play.api.inject.Injector
 import play.api.libs.json.{Json, OFormat}
 
+import java.time.{Duration, LocalTime, ZoneId, ZonedDateTime}
 import java.util.Date
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
@@ -57,7 +58,9 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
       val thirdId = 3
       val fourthId = 4
 
-      val currentDate = new Date(123)
+      val zoneId = ZoneId.systemDefault()
+      val date = ZonedDateTime.of(2022, 9, 14, 16, 2, 2, 0, zoneId)
+      val currentDate = new Date(date.toEpochSecond * 1000)
 
       val repo = mock[BackgroundJobRepository]
       val settings = MoonlightSettings(
@@ -67,35 +70,74 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
         betweenRunAttemptInterval = 30.minutes,
         maxJobRetries = 3,
         jobRunTimeout = 1.second,
+        completedJobsTtl = 90.days,
         workerSpecs = Seq(Worker1Spec)
       )
 
-      abstract class TestScheduler extends Scheduler {
+      val schedulerCancel = mock[Cancellable]
+      schedulerCancel.cancel() returns true
+
+      class TestScheduler extends Scheduler {
         def scheduleOnce(delay: FiniteDuration, runnable: Runnable)(implicit
           executor: ExecutionContext
         ): Cancellable = {
           runnable.run()
-          null
+
+          schedulerCancel
         }
+
+        def scheduleAtFixedRate(initialDelay: FiniteDuration, interval: FiniteDuration)(runnable: Runnable)(implicit
+          executor: ExecutionContext
+        ): Cancellable = {
+          runnable.run()
+
+          schedulerCancel
+        }
+
+        override def scheduleOnce(delay: Duration, runnable: Runnable, executor: ExecutionContext): Cancellable = ???
+
+        override def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(runnable: Runnable)(
+          implicit executor: ExecutionContext
+        ): Cancellable = ???
+
+        override def scheduleWithFixedDelay(
+          initialDelay: Duration,
+          delay: Duration,
+          runnable: Runnable,
+          executor: ExecutionContext
+        ): Cancellable = ???
+
+        override def scheduleAtFixedRate(
+          initialDelay: Duration,
+          interval: Duration,
+          runnable: Runnable,
+          executor: ExecutionContext
+        ): Cancellable = ???
       }
 
       implicit val injector: Injector = mock[Injector]
-      implicit val scheduler: Scheduler = mock[TestScheduler]
+      implicit val scheduler: Scheduler = new TestScheduler
       implicit val dateTimeFactory: DateTimeFactory = mock[DateTimeFactory]
       implicit val random: Random = mock[Random]
-      val schedulerCancel = mock[Cancellable]
 
       val dispatcher = new JobDispatcher(repo, settings, dateTimeFactory)
 
       dateTimeFactory.now returns currentDate
-      scheduler.scheduleAtFixedRate(0.minutes, 1.hour)(*)(*) returns schedulerCancel
-      schedulerCancel.cancel() returns true
 
       // promise that will be completed when all jobs were retrieved
       // it's needed for proper synchronisation to avoid "wait-based" sync
       val allJobsWereUsed = Promise[Unit]
 
-      scheduler.scheduleOnce(1.milli, *)(*) calls realMethod
+      // simulates maintenance
+      date.minusDays(90).toLocalDate.atTime(LocalTime.MIDNIGHT).atZone(zoneId).toEpochSecond
+      repo
+        .deleteJobsSucceededOrFailedBefore(
+          new Date(date.minusDays(90).toLocalDate.atTime(LocalTime.MIDNIGHT).atZone(zoneId).toEpochSecond * 1000)
+        )
+        .returns(Future.successful(50))
+
+      // simulates maintenance 2
+      repo.maintainExpiredJobs(1.second, currentDate) returns Future.successful(100)
 
       // simulates 3+ calls of job retrieving method
       repo
@@ -157,7 +199,6 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
 
       injector.instanceOf[Worker1](classTag[Worker1]) returns new Worker1
       random.between(60000L, 66000L) returns 61000L
-      scheduler.scheduleOnce(61000.millis, *)(*) calls realMethod
 
       val (cancelLoop, loopFuture) = dispatcher.runLoop()
 

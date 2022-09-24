@@ -14,11 +14,12 @@ import java.util.Date
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 
-class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
-  with Matchers
-  with DatabaseSpec
-  with DatabaseSchemaSupport
-  with AsyncIdiomaticMockito {
+class BackgroundJobJdbcRepositorySpec
+    extends AsyncWordSpecLike
+    with Matchers
+    with DatabaseSpec
+    with DatabaseSchemaSupport
+    with AsyncIdiomaticMockito {
 
   import profile.api._
 
@@ -35,7 +36,7 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
 
   private implicit val jobId: JobId[JobExampleParam] = JobId[JobExampleParam]("example")
   private implicit val jsonFormat: OFormat[JobExampleParam] = Json.format[JobExampleParam]
-  private val param =  JobExampleParam(444, "555")
+  private val param = JobExampleParam(444, "555")
   private val priority = 1
 
   private val nowDate = new Date(123456789)
@@ -56,6 +57,7 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
   )
 
   private val failedJobExample = jobExample.copy(status = Status.Failed)
+  private val succeededJobExample = jobExample.copy(status = Status.Succeeded)
 
   "BackgroundJobJdbcRepository.enqueue" should {
     "enqueue a job" in {
@@ -136,10 +138,12 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
       val futureDate = nowDate.add(10.milli)
 
       for {
-        okToRestart <- insertJob(jobExample.copy(
-          status = Status.Failed,
-          tryCount = maxAttempts - 1,
-          finishedAtOpt = Some(new Date(currentDate.getTime - interval.toMillis - 1)))
+        okToRestart <- insertJob(
+          jobExample.copy(
+            status = Status.Failed,
+            tryCount = maxAttempts - 1,
+            finishedAtOpt = Some(new Date(currentDate.getTime - interval.toMillis - 1))
+          )
         )
         // is not supposed to be started now
         _ <- insertJob(jobExample.copy(shouldRunAt = futureDate))
@@ -252,7 +256,14 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
           alreadySucceeded <- insertJob(jobExample.copy(status = Status.Succeeded, startedAtOpt = Some(updateDate)))
           dummy <- insertJob(jobExample.copy(status = Status.Started, startedAtOpt = Some(updateDate)))
           alreadyStartedIsChanged <- repo.tryMarkJobAsStarted(alreadyStarted.id, 1, updateDate, 1, nowDate, 1.minute)
-          alreadySucceededIsChanged <- repo.tryMarkJobAsStarted(alreadySucceeded.id, 1, updateDate, 1, nowDate, 1.minute)
+          alreadySucceededIsChanged <- repo.tryMarkJobAsStarted(
+            alreadySucceeded.id,
+            1,
+            updateDate,
+            1,
+            nowDate,
+            1.minute
+          )
           dbContent <- db.run(tables.backgroundJobs.result)
         } yield {
           alreadyStartedIsChanged shouldBe false
@@ -359,6 +370,40 @@ class BackgroundJobJdbcRepositorySpec extends AsyncWordSpecLike
           ),
           dummy
         )
+      }
+    }
+  }
+
+  "BackgroundJobJdbcRepository.deleteJobsSucceededOrFailedBefore" should {
+    "delete jobs that satisfy conditions" in {
+      val boundDate = nowDate.add(1.minute)
+      val futureDate = nowDate.add(2.minute)
+
+      val j1 = jobExample.copy(finishedAtOpt = Some(nowDate)) // wrong status
+      val j2 = jobExample.copy(finishedAtOpt = Some(nowDate), status = Status.Started) // wrong status
+      val j3 = failedJobExample.copy(finishedAtOpt = Some(nowDate))
+      val j4 = succeededJobExample.copy(finishedAtOpt = Some(nowDate))
+
+      val j5 = jobExample.copy(finishedAtOpt = Some(futureDate)) // wrong date
+      val j6 = failedJobExample.copy(finishedAtOpt = Some(futureDate), status = Status.Started) // wrong date
+      val j7 = failedJobExample.copy(finishedAtOpt = Some(futureDate)) // wrong date
+      val j8 = succeededJobExample.copy(finishedAtOpt = Some(futureDate)) // wrong date
+
+      for {
+        j1Ins <- insertJob(j1)
+        j2Ins <- insertJob(j2)
+        _ <- insertJob(j3)
+        _ <- insertJob(j4)
+        j5Ins <- insertJob(j5)
+        j6Ins <- insertJob(j6)
+        j7Ins <- insertJob(j7)
+        j8Ins <- insertJob(j8)
+        removedCount <- repo.deleteJobsSucceededOrFailedBefore(boundDate)
+        dbContent <- db.run(tables.backgroundJobs.result)
+      } yield {
+        removedCount shouldBe 2
+
+        dbContent.map(_.id) should contain theSameElementsAs Seq(j1Ins, j2Ins, j5Ins, j6Ins, j7Ins, j8Ins).map(_.id)
       }
     }
   }

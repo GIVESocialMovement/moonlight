@@ -9,13 +9,14 @@ import java.util.Date
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class BackgroundJobServiceImpl @Inject()(repo: BackgroundJobRepository, dateTimeFactory: DateTimeFactory)
-                                        (implicit ec: ExecutionContext)
-  extends LegacyBackgroundJobService
-    with BackgroundJobService {
+class BackgroundJobServiceImpl @Inject() (repo: BackgroundJobRepository, dateTimeFactory: DateTimeFactory)(implicit
+  ec: ExecutionContext
+) extends BackgroundJobService {
 
-  def enqueue[T <: Job](shouldRunAt: Date, priority: Int, param: T)
-                       (implicit jsonFormat: OFormat[T], id: JobId[T]): Future[BackgroundJob] = {
+  def enqueue[T <: Job](shouldRunAt: Date, priority: Int, param: T)(implicit
+    jsonFormat: OFormat[T],
+    id: JobId[T]
+  ): Future[BackgroundJob] = {
     val backgroundJob = BackgroundJob(
       id = -1,
       createdAt = dateTimeFactory.now,
