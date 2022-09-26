@@ -24,43 +24,60 @@ case class JobExecutionError(realCause: Throwable) extends Exception("Job execut
 /**
  * Dispatches jobs
  *
- * @param bgJobRepo background jobs repository
- * @param settings moonlight settings
- * @param dateTimeFactory date/time factory
- * @param executionContext execution context
- * @param injector DI system injector
- * @param scheduler task scheduler
- * @param random randomizer for duration randomization
+ * @param bgJobRepo
+ *   background jobs repository
+ * @param settings
+ *   moonlight settings
+ * @param dateTimeFactory
+ *   date/time factory
+ * @param executionContext
+ *   execution context
+ * @param injector
+ *   DI system injector
+ * @param scheduler
+ *   task scheduler
+ * @param random
+ *   randomizer for duration randomization
  */
-class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
-                    settings: MoonlightSettings,
-                    dateTimeFactory: DateTimeFactory
-                   )(implicit executionContext: ExecutionContext,
-                     injector: Injector,
-                     scheduler: Scheduler,
-                     random: Random) {
+class JobDispatcher @Inject() (
+  bgJobRepo: BackgroundJobRepository,
+  settings: MoonlightSettings,
+  dateTimeFactory: DateTimeFactory
+)(implicit executionContext: ExecutionContext, injector: Injector, scheduler: Scheduler, random: Random) {
   private[this] val logger = Logger(this.getClass)
 
   /**
-   * Schedules maintenance task that will "unstuck" jobs
+   * Schedules 2 maintenance tasks
+   *   - first will delete old jobs
+   *   - second will "unstuck" jobs
    *
    * @return
    */
   private def scheduleMaintenance(): Cancellable = {
     scheduler.scheduleAtFixedRate(0.minutes, settings.maintenanceInterval)(() => {
+      bgJobRepo
+        .deleteJobsSucceededOrFailedBefore(dateTimeFactory.now.sub(settings.completedJobsTtl).midnight)
+        .onComplete {
+          case Success(0) =>
+          case Success(numberOfDeletedJobs) =>
+            logger.warn(s"$numberOfDeletedJobs succeeded/failed jobs were removed")
+          case Failure(e) =>
+            logger.error("maintenance (delete task) error", e)
+        }
+
       val _ = bgJobRepo.maintainExpiredJobs(settings.jobRunTimeout, dateTimeFactory.now).onComplete {
         case Success(0) =>
         case Success(numberOfMaintainedJobs) =>
           logger.warn(s"$numberOfMaintainedJobs expired jobs were maintained")
         case Failure(e) =>
-          logger.error("maintenance error", e)
+          logger.error("maintenance (unstuck task) error", e)
       }
     })
   }
 
   /**
-   * Get job that can be started now.
-   * First checks pending jobs, if there is no any then checks failed jobs that can be retried
+   * Get job that can be started now. First checks pending jobs, if there is no any then checks failed jobs that can be
+   * retried
    *
    * @return
    */
@@ -75,10 +92,10 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
   }
 
   /**
-   * Dispatcher main loop
-   * Picks tasks and runs it, pauses if no tasks
-   * 
-   * @return loop cancel control, future that will be finished after cancel
+   * Dispatcher main loop Picks tasks and runs it, pauses if no tasks
+   *
+   * @return
+   *   loop cancel control, future that will be finished after cancel
    */
   def runLoop(): (Cancellable, Future[Unit]) = {
     val runPromise = Promise[Unit]
@@ -91,20 +108,20 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
       Option.when(untilRunning.get())(()) match {
         case Some(_) =>
           getJobReadyForStart
-          .onComplete {
-            case Success(Some(job)) =>
-              runJob(job, threadSeqId).foreach(_ => runForever(threadSeqId))
-            // maybe db error
-            case Failure(e) =>
-              logger.error("can't get job", e)
-              scheduler.scheduleOnce(settings.pauseDurationWhenNoJobsRandomized, () => runForever(threadSeqId))
-            // no jobs for start
-            case _ =>
-              scheduler.scheduleOnce(settings.pauseDurationWhenNoJobsRandomized, () => runForever(threadSeqId))
-          }
+            .onComplete {
+              case Success(Some(job)) =>
+                runJob(job, threadSeqId).foreach(_ => runForever(threadSeqId))
+              // maybe db error
+              case Failure(e) =>
+                logger.error("can't get job", e)
+                scheduler.scheduleOnce(settings.pauseDurationWhenNoJobsRandomized, () => runForever(threadSeqId))
+              // no jobs for start
+              case _ =>
+                scheduler.scheduleOnce(settings.pauseDurationWhenNoJobsRandomized, () => runForever(threadSeqId))
+            }
         case _ =>
           logger.info(s"$threadSeqId closing worker")
-          if(workersLeft.decrementAndGet() == 0) {
+          if (workersLeft.decrementAndGet() == 0) {
             logger.info(s"$threadSeqId finishing run loop")
             runPromise.trySuccess(())
           }
@@ -113,9 +130,8 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
 
     // respect required parallelism
     (1 to settings.parallelism)
-      .foreach {
-        threadSeqId =>
-          scheduler.scheduleOnce(JobDispatcher.jobStartDelay, () => runForever(threadSeqId))
+      .foreach { threadSeqId =>
+        scheduler.scheduleOnce(JobDispatcher.jobStartDelay, () => runForever(threadSeqId))
       }
 
     val maintenanceCancelControl = scheduleMaintenance()
@@ -124,6 +140,7 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
       override def cancel(): Boolean = {
         maintenanceCancelControl.cancel()
         untilRunning.set(false)
+
         true
       }
 
@@ -136,8 +153,10 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
   /**
    * Runs specified background job
    *
-   * @param job background job
-   * @param threadSeqId number from 1 to <parallelism>
+   * @param job
+   *   background job
+   * @param threadSeqId
+   *   number from 1 to <parallelism>
    * @return
    */
   private def runJob(job: BackgroundJob, threadSeqId: Int): Future[Unit] = {
@@ -166,13 +185,14 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
             _ <- worker.runAsync(job).withTimeout(settings.jobRunTimeout)
             _ <- bgJobRepo.markJobAsSucceed(job.id, dateTimeFactory.now)
           } yield {
-            logger.info(s"#$threadSeqId worker ${worker.getClass.getSimpleName} with job ${job.id} finished successfully")
+            logger.info(
+              s"#$threadSeqId worker ${worker.getClass.getSimpleName} with job ${job.id} finished successfully"
+            )
           }
 
-          runFuture.onComplete {
-            _ =>
-              val duration = Instant.now().toEpochMilli - startInMillis
-              logger.info(s"#$threadSeqId job ${job.id} took $duration millis")
+          runFuture.onComplete { _ =>
+            val duration = Instant.now().toEpochMilli - startInMillis
+            logger.info(s"#$threadSeqId job ${job.id} took $duration millis")
           }
 
           runFuture.recover(e => throw JobExecutionError(e))
@@ -180,19 +200,24 @@ class JobDispatcher @Inject()(bgJobRepo: BackgroundJobRepository,
       // this "recover" will try to mark job as failed
       .recoverWith {
         case JobExecutionError(e) =>
-          logger.error(s"#$threadSeqId error occurred while running the job " +
-            s"(id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}, tryCount=${job.tryCount}).", e)
+          logger.error(
+            s"#$threadSeqId error occurred while running the job " +
+              s"(id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}, tryCount=${job.tryCount}).",
+            e
+          )
           bgJobRepo.markJobAsFailed(job.id, e, dateTimeFactory.now)
         case e: WorkerSearchException =>
-          logger.error(s"#$threadSeqId error occurred while searching for worker " +
-            s"(id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}, tryCount=${job.tryCount})", e)
+          logger.error(
+            s"#$threadSeqId error occurred while searching for worker " +
+              s"(id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}, tryCount=${job.tryCount})",
+            e
+          )
           bgJobRepo.markJobAsFailed(job.id, e, dateTimeFactory.now)
       }
       // in case of other error like db failure
-      .recover {
-        case e =>
-          logger.error(s"#$threadSeqId critical failure job $job failure", e)
-          ()
+      .recover { case e =>
+        logger.error(s"#$threadSeqId critical failure job $job failure", e)
+        ()
       }
   }
 }

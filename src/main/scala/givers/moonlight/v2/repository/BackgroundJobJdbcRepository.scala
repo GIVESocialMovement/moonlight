@@ -39,6 +39,12 @@ class BackgroundJobJdbcRepository @Inject() (
       .map(job => (job.status, job.finishedAtOpt, job.error))
   )
 
+  private val jobsSucceededOrFailedBeforeQuery = Compiled((rightBound: Rep[Date]) =>
+    backgroundJobs
+      .filter(job => job.status === Status.Succeeded || job.status === Status.Failed)
+      .filter(job => job.finishedAtOpt <= rightBound)
+  )
+
   private val markJobAsSucceededSelectQuery = Compiled((bgJobId: Rep[Long]) =>
     backgroundJobs
       .filter(_.id === bgJobId)
@@ -217,5 +223,12 @@ class BackgroundJobJdbcRepository @Inject() (
     db
       .run(markJobAsFailedSelectQuery(bgJobId).update((Status.Failed, Some(updateDate), error)))
       .map(_ => ())
+  }
+
+  /**
+   * @inheritdoc
+   */
+  override def deleteJobsSucceededOrFailedBefore(date: Date): Future[Int] = {
+    db.run(jobsSucceededOrFailedBeforeQuery(date).delete)
   }
 }

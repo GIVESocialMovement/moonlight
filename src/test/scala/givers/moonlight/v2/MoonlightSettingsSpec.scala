@@ -18,11 +18,13 @@ class MoonlightSettingsSpec extends AnyWordSpecLike with Matchers with Idiomatic
     implicit val jsonFormat: OFormat[JobData] = Json.format[JobData]
   }
 
-  class WorkerSpecExample(val identifier: String, val previousIdentifiers: Set[String]) extends WorkerSpec with AsyncWorkerSpec {
+  class WorkerSpecExample(val identifier: String, val previousIdentifiers: Set[String])
+      extends WorkerSpec
+      with AsyncWorkerSpec {
     type Data = WorkerSpecExample.JobData
     type Runner = WorkerExample
 
-    implicit val classTag = ClassTag(classOf[WorkerExample])
+    implicit val classTag: ClassTag[WorkerExample] = ClassTag(classOf[WorkerExample])
     implicit val jsonFormat: OFormat[WorkerSpecExample.JobData] = WorkerSpecExample.jsonFormat
   }
 
@@ -38,7 +40,7 @@ class MoonlightSettingsSpec extends AnyWordSpecLike with Matchers with Idiomatic
     new WorkerSpecExample("w_2", Set("w2"))
   )
 
-  private val settings = MoonlightSettings(1, 3.seconds, 0.seconds, 0.seconds, 1, 0.seconds, workerSpecs)
+  private val settings = MoonlightSettings(1, 3.seconds, 0.seconds, 0.seconds, 1, 0.seconds, 90.days, workerSpecs)
 
   private implicit val injector: Injector = mock[Injector]
 
