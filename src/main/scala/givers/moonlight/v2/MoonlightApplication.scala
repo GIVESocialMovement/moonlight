@@ -41,7 +41,7 @@ trait MoonlightApplicationBase {
     }
 
     app.injector.instanceOf[CoordinatedShutdown]
-      .addTask(CoordinatedShutdown.PhaseServiceUnbind, "stop-main-loop") {
+      .addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "stop-main-loop") {
         () =>
           logger.info("cancelling run loop on shutdown")
           runLoopControl.cancel()

@@ -4,11 +4,13 @@ scalaVersion := "2.13.8"
 
 libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-slick" % "5.0.0" withSources () withJavadoc (),
-  "com.typesafe.play" %% "play-guice" % "2.8.2" withSources () withJavadoc (),
+  "com.typesafe.play" %% "play-guice" % "2.8.15" withSources () withJavadoc (),
   "com.google.inject" % "guice" % "5.1.0",
   "org.postgresql" % "postgresql" % "42.2.14" withSources () withJavadoc (),
   "com.typesafe.play" %% "play-json" % "2.8.1",
   "io.netty" % "netty-common" % "4.1.76.Final",
+  "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.4",
+  "io.dropwizard" % "dropwizard-metrics-graphite" % "2.1.4",
   "com.typesafe.play" %% "play-slick-evolutions" % "5.0.0" % Test,
   "org.mockito" % "mockito-core" % "2.18.3" % Test,
   "com.lihaoyi" %% "utest" % "0.7.10" % Test,
@@ -22,7 +24,7 @@ organization := "io.github.givesocialmovement"
 
 name := "play-moonlight"
 
-version := "0.20.0"
+version := "1.0.0"
 
 Test / parallelExecution := false
 

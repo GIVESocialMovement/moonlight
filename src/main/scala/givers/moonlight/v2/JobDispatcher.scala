@@ -2,9 +2,10 @@ package givers.moonlight.v2
 
 import akka.actor.Cancellable
 import akka.actor.typed.Scheduler
+import com.codahale.metrics.{MetricRegistry, SettableGauge}
 import com.google.inject.Singleton
-import givers.moonlight.BackgroundJob
-import givers.moonlight.util.DateTimeFactory
+import givers.moonlight.{BackgroundJob, JobExecutor}
+import givers.moonlight.util.{DateTimeFactory, Metrics}
 import givers.moonlight.util.RichDate._
 import givers.moonlight.util.RichFuture.TimeoutAwareFuture
 import givers.moonlight.v2.repository.BackgroundJobRepository
@@ -16,9 +17,16 @@ import java.util.concurrent.atomic.{AtomicBoolean, AtomicInteger}
 import javax.inject.Inject
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.concurrent.{ExecutionContext, Future, Promise}
-import scala.util.{Failure, Random, Success}
+import scala.util.control.NoStackTrace
+import scala.util.{Failure, Random, Success, Try}
 
 case class JobExecutionError(realCause: Throwable) extends Exception("Job execution error", realCause)
+case class JobTypeExecutorAlreadyExists(typeId: String)
+    extends Exception(s"Job executor for $typeId already exists")
+
+case class JobExecutorNotFound(typeId: String)
+    extends Exception(s"Job executor for $typeId not found")
+    with NoStackTrace
 
 @Singleton
 /**
@@ -42,9 +50,30 @@ case class JobExecutionError(realCause: Throwable) extends Exception("Job execut
 class JobDispatcher @Inject() (
   bgJobRepo: BackgroundJobRepository,
   settings: MoonlightSettings,
-  dateTimeFactory: DateTimeFactory
+  dateTimeFactory: DateTimeFactory,
+  metricRegistry: MetricRegistry
 )(implicit executionContext: ExecutionContext, injector: Injector, scheduler: Scheduler, random: Random) {
   private[this] val logger = Logger(this.getClass)
+
+  private val readyToStartCount = metricRegistry.gauge[SettableGauge[Int]](Metrics.jobDispatcher.jobsReadyToStart)
+  private val jobsOverall = metricRegistry.gauge[SettableGauge[Int]](Metrics.jobDispatcher.jobsOverall)
+
+  private val maintenanceDeleteOldTimer = metricRegistry.timer(Metrics.jobDispatcher.maintenanceOldJobs)
+  private val maintenanceDeleteOldErrorCount = metricRegistry.counter(Metrics.jobDispatcher.maintenanceOldJobsErrors)
+
+  private val maintenanceUnstuckTimer = metricRegistry.timer(Metrics.jobDispatcher.maintenanceUnstuck)
+  private val maintenanceUnstuckErrorCount = metricRegistry.counter(Metrics.jobDispatcher.maintenanceUnstuckErrors)
+
+  private val concurrentFailCount = metricRegistry.counter(Metrics.jobDispatcher.concurrentFail)
+
+  val typeExecutors: Map[String, JobExecutor[_]] = {
+    settings.executors.foldLeft(Map.empty[String, JobExecutor[_]]) { case (current, executor) =>
+      current.updatedWith(executor.jobType.id) {
+        case Some(_) => throw JobTypeExecutorAlreadyExists(executor.jobType.id)
+        case _ => Some(executor)
+      }
+    }
+  }
 
   /**
    * Schedules 2 maintenance tasks
@@ -55,23 +84,56 @@ class JobDispatcher @Inject() (
    */
   private def scheduleMaintenance(): Cancellable = {
     scheduler.scheduleAtFixedRate(0.minutes, settings.maintenanceInterval)(() => {
+      val oldJobsDeleteTimer = maintenanceDeleteOldTimer.time()
       bgJobRepo
         .deleteJobsSucceededOrFailedBefore(dateTimeFactory.now.sub(settings.completedJobsTtl).midnight)
         .onComplete {
           case Success(0) =>
+            oldJobsDeleteTimer.stop()
           case Success(numberOfDeletedJobs) =>
+            oldJobsDeleteTimer.stop()
             logger.warn(s"$numberOfDeletedJobs succeeded/failed jobs were removed")
           case Failure(e) =>
+            oldJobsDeleteTimer.stop()
+            maintenanceDeleteOldErrorCount.inc()
             logger.error("maintenance (delete task) error", e)
         }
 
+      val unstuckTimer = maintenanceUnstuckTimer.time()
       val _ = bgJobRepo.maintainExpiredJobs(settings.jobRunTimeout, dateTimeFactory.now).onComplete {
         case Success(0) =>
+          unstuckTimer.stop()
         case Success(numberOfMaintainedJobs) =>
+          unstuckTimer.stop()
           logger.warn(s"$numberOfMaintainedJobs expired jobs were maintained")
         case Failure(e) =>
+          unstuckTimer.stop()
+          maintenanceUnstuckErrorCount.inc()
           logger.error("maintenance (unstuck task) error", e)
       }
+    })
+  }
+
+  private def scheduleMetrics(): Cancellable = {
+    scheduler.scheduleAtFixedRate(0.minutes, settings.countMetricsCollectionInterval)(() => {
+      bgJobRepo
+        .countPendingJobReadyForStart(dateTimeFactory.now)
+        .onComplete {
+          case Success(count) =>
+            readyToStartCount.setValue(count)
+          case Failure(e) =>
+            readyToStartCount.setValue(-1)
+            logger.error("maintenance (delete task) error", e)
+        }
+
+      bgJobRepo.count
+        .onComplete {
+          case Success(count) =>
+            jobsOverall.setValue(count)
+          case Failure(e) =>
+            jobsOverall.setValue(-1)
+            logger.error("maintenance (delete task) error", e)
+        }
     })
   }
 
@@ -101,8 +163,8 @@ class JobDispatcher @Inject() (
     val runPromise = Promise[Unit]
     val untilRunning = new AtomicBoolean(true)
 
-    // the idea is to complete runPromise only when last worker is closed
-    val workersLeft = new AtomicInteger(settings.parallelism)
+    // the idea is to complete runPromise only when last executor is closed
+    val executorsLeft = new AtomicInteger(settings.parallelism)
 
     def runForever(threadSeqId: Int): Unit = {
       Option.when(untilRunning.get())(()) match {
@@ -120,8 +182,8 @@ class JobDispatcher @Inject() (
                 scheduler.scheduleOnce(settings.pauseDurationWhenNoJobsRandomized, () => runForever(threadSeqId))
             }
         case _ =>
-          logger.info(s"$threadSeqId closing worker")
-          if (workersLeft.decrementAndGet() == 0) {
+          logger.info(s"$threadSeqId closing executor")
+          if (executorsLeft.decrementAndGet() == 0) {
             logger.info(s"$threadSeqId finishing run loop")
             runPromise.trySuccess(())
           }
@@ -135,9 +197,11 @@ class JobDispatcher @Inject() (
       }
 
     val maintenanceCancelControl = scheduleMaintenance()
+    val metricsCancelControl = scheduleMetrics()
 
     val loopCancelControl = new Cancellable {
       override def cancel(): Boolean = {
+        metricsCancelControl.cancel()
         maintenanceCancelControl.cancel()
         untilRunning.set(false)
 
@@ -163,7 +227,14 @@ class JobDispatcher @Inject() (
     val startInMillis = Instant.now().toEpochMilli
 
     val startResult = for {
-      worker <- Future(settings.getWorkerByJobType(job.jobType))
+      executor <- Future.fromTry(
+        Try(
+          typeExecutors.getOrElse(
+            job.jobType,
+            throw JobExecutorNotFound(job.jobType)
+          )
+        )
+      )
       isStarted <- bgJobRepo.tryMarkJobAsStarted(
         job.id,
         job.tryCount + 1,
@@ -172,27 +243,34 @@ class JobDispatcher @Inject() (
         dateTimeFactory.now,
         settings.betweenRunAttemptInterval
       )
-    } yield (isStarted, worker)
+    } yield (isStarted, executor)
 
     startResult
       .flatMap {
         case (false, _) =>
           logger.warn(s"#$threadSeqId job ${job.id} can't be started because it's started by someone else")
+          concurrentFailCount.inc()
           Future.successful(())
-        case (_, worker) =>
-          logger.info(s"#$threadSeqId starting worker ${worker.getClass.getSimpleName} for job ${job.id}")
+        case (_, executor) =>
+          logger.info(s"#$threadSeqId starting executor ${executor.getClass.getSimpleName} for job ${job.id}")
+          val timer = metricRegistry.timer(Metrics.executor.duration(job.jobType)).time()
+
           val runFuture = for {
-            _ <- worker.runAsync(job).withTimeout(settings.jobRunTimeout)
+            _ <- executor.run(job.paramsInJsonString).withTimeout(settings.jobRunTimeout)
             _ <- bgJobRepo.markJobAsSucceed(job.id, dateTimeFactory.now)
           } yield {
             logger.info(
-              s"#$threadSeqId worker ${worker.getClass.getSimpleName} with job ${job.id} finished successfully"
+              s"#$threadSeqId executor ${executor.getClass.getSimpleName} with job ${job.id} finished successfully"
             )
           }
 
-          runFuture.onComplete { _ =>
+          runFuture.onComplete { res =>
+            timer.stop()
             val duration = Instant.now().toEpochMilli - startInMillis
             logger.info(s"#$threadSeqId job ${job.id} took $duration millis")
+
+            res.foreach(_ => metricRegistry.counter(Metrics.executor.succeeded(job.jobType)).inc())
+            res.failed.foreach(_ => metricRegistry.counter(Metrics.executor.failed(job.jobType)).inc())
           }
 
           runFuture.recover(e => throw JobExecutionError(e))
@@ -206,9 +284,9 @@ class JobDispatcher @Inject() (
             e
           )
           bgJobRepo.markJobAsFailed(job.id, e, dateTimeFactory.now)
-        case e: WorkerSearchException =>
+        case e: JobExecutorNotFound =>
           logger.error(
-            s"#$threadSeqId error occurred while searching for worker " +
+            s"#$threadSeqId error occurred while searching for executor " +
               s"(id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}, tryCount=${job.tryCount})",
             e
           )

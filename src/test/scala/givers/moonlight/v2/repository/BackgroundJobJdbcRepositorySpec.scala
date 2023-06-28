@@ -3,7 +3,7 @@ package givers.moonlight.v2.repository
 import givers.moonlight.BackgroundJob.Status
 import givers.moonlight.persistence.table.BackgroundJobTableComponent
 import givers.moonlight.util.RichDate.RichDate
-import givers.moonlight.{BackgroundJob, JobId}
+import givers.moonlight.{BackgroundJob, BackgroundJobDescription, JobInSerDe, JobType}
 import helpers.{DatabaseSchemaSupport, DatabaseSpec, H2SlickJdbcProfile}
 import org.mockito.scalatest.AsyncIdiomaticMockito
 import org.scalatest.matchers.should.Matchers
@@ -32,11 +32,11 @@ class BackgroundJobJdbcRepositorySpec
     tables
   )
 
-  case class JobExampleParam(campaignId: Long, oneMoreId: String) extends givers.moonlight.Job
 
-  private implicit val jobId: JobId[JobExampleParam] = JobId[JobExampleParam]("example")
+  case class JobExampleParam(campaignId: Long, oneMoreId: String)
   private implicit val jsonFormat: OFormat[JobExampleParam] = Json.format[JobExampleParam]
-  private val param = JobExampleParam(444, "555")
+
+  private implicit val jobType: JobType[JobExampleParam] = JobType[JobExampleParam]("example", JobInSerDe.json)
   private val priority = 1
 
   private val nowDate = new Date(123456789)
@@ -51,7 +51,7 @@ class BackgroundJobJdbcRepositorySpec
     status = BackgroundJob.Status.Pending,
     error = "",
     tryCount = 0,
-    jobType = jobId.value,
+    jobType = jobType.id,
     paramsInJsonString = """{"campaignId":444,"oneMoreId":"555"}""",
     priority = priority
   )
@@ -62,7 +62,7 @@ class BackgroundJobJdbcRepositorySpec
   "BackgroundJobJdbcRepository.enqueue" should {
     "enqueue a job" in {
       for {
-        savedJob <- repo.enqueue(BackgroundJob.forEnqueue(nowDate, priority, param))
+        savedJob <- repo.enqueue(jobExample)
         dbContent <- db.run(tables.backgroundJobs.result)
       } yield {
         val expectedJob = jobExample.copy(id = savedJob.id, createdAt = savedJob.createdAt)

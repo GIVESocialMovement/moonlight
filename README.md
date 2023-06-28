@@ -1,4 +1,4 @@
-Moonlight (version 1)
+Moonlight
 ==========
 
 [![CircleCI](https://circleci.com/gh/GIVESocialMovement/moonlight/tree/master.svg?style=shield)](https://circleci.com/gh/GIVESocialMovement/moonlight/tree/master)
@@ -38,71 +38,47 @@ Please apply the SQLs to your database.
 
 ```
 resolvers += Resolver.bintrayRepo("givers", "maven")
-libraryDependencies += "givers.moonlight" %% "play-moonlight" % "0.4.0"
+libraryDependencies += "givers.moonlight" %% "play-moonlight" % "x.x.x"
 ```
 
 The artifacts are hosted here: https://bintray.com/givers/maven/play-moonlight
 
-### 3. Create a worker
+### 3. Create a executor
 
 You can define a delayed job by providing `WorkerSpec` which allows you to specify params and job runner. Here's an example:
 
 ```
-import com.google.inject.{Inject, Singleton}
-import givers.moonlight.{BackgroundJob, Worker, WorkerSpec}
-import play.api.Logger
-import play.api.libs.json.{Json, OFormat}
+@Singleton
+class SimpleExecutor @Inject()()
+    extends JobExecutor(SimpleExecutor.jobType) {
 
-import scala.concurrent.ExecutionContext
-import scala.reflect.ClassTag
-
-object SimpleWorkerSpec extends WorkerSpec {
-  case class Job(userId: Long) extends givers.moonlight.Job
-
-  type Data = Job
-  type Runner = SimpleWorker
-
-  implicit val classTag = ClassTag(classOf[SimpleWorker])
-  implicit val jsonFormat: OFormat[Job] = Json.format[Job]
-
-  val identifier = "Simple"  // Job's identifier (should be unique)
-  val previousIdentifiers = Set.empty  // In case, you'd like to change identifier
+  override def run(data: SimpleExecutor.Job): Future[Unit] = Future.successful(())
 }
 
-@Singleton
-class SimpleWorker @Inject()(
-  // You may inject any needed dependency here
-  userService: UserService
-) extends Worker[SimpleWorkerSpec.Job] {
+object SimpleExecutor {
+  case class Job(data: String)
 
-  private[this] val logger = Logger(this.getClass)
-
-  def run(param: SimpleWorkerSpec.Job, job: BackgroundJob): Unit = {
-    val user = userService.getById(param.userId)
-    println(s"Process user (id=${user.id})")
-  }
+  val jobType: JobType[Job] = JobType("SimpleAsync", JobInSerDe.json(Json.format[Job]))
 }
 ```
-
 
 ### 4. Install Moonlight's module
 
-Create a module with defined `WorkerSpec`:
+Create a module with defined `SimpleExecutor`:
 
 ```
-package modules
-
-import givers.moonlight.{Config, Moonlight}
-import play.api.{Configuration, Environment}
-
 class MoonlightModule extends play.api.inject.Module {
   def bindings(environment: Environment, configuration: Configuration)  = Seq(
-    bind[Moonlight].toInstance(new Moonlight(
-      // When 3 errors occurs, Moonlight will exit. This is for avoiding being stuck in error repetitively.
-      // For example, in our case, on Heroku, when Moonlight runs on a bad machine, it will stop by itself and be
-      // started on a good machine.
-      config = Config(maxErrorCountToKillOpt = Some(3),
-      workers = Seq(SimpleWorkerSpec)
+    bind[MoonlightSettings].toInstance(new MoonlightSettings(
+        parallelism = Runtime.getRuntime.availableProcessors(),
+        pauseDurationWhenNoJobs = 10.seconds,
+        maintenanceInterval = 1.minutes,
+        betweenRunAttemptInterval = 10.minutes,
+        countMetricsCollectionInterval = 1.minute,
+        maxJobRetries = 3,
+        jobRunTimeout = 10.seconds,
+        completedJobsTtl = (24 * 30).hours,
+        executors = Seq(simpleExecutor)
     ))
   )
 }
@@ -119,26 +95,18 @@ slick.dbs.default.db.properties.url="postgres://user:pass@localhost:5432/databas
 
 ### 5. Run Moonlight
 
-You can run Moonlight locally with `sbt 'runMain givers.moonlight.Main dev run'`.
+You can run Moonlight locally with `sbt 'runMain givers.moonlight.v2.MoonlightApplication dev'`.
 
 On Heroku, you can run Moonlight by adding the below line to `Procfile`:
 
 ```
-worker: ./target/universal/stage/bin/[your_app_name] -Dconfig.resource=application.conf -main givers.moonlight.Main -- prod
+moonlight: target/universal/stage/bin/giveasia -Dconfig.resourceapplication.conf -main givers.moonlight.v2.MoonlightApplication -- prod
 ```
 
-Please see a full example in the folder `test-project`.
+Please see a full example in the folder `test-project-v2`.
 
 
 Interested in using the framework?
 -----------------------------------
 
 Please don't hesitate to ask questions by opening a Github issue. We want you to use Moonlight successfully.
-
-
-Future improvement
--------------------
-
-* Support more than one worker by implementing Postgresql-based mutual lock.
-* Improve Moonlight API to prevent mistakes like defining a job but forgetting to register the runner.
-* Reduce the verbosity of WorkerSpec. We should be able to use Macros to define `jsonFormat` and `classTag`.

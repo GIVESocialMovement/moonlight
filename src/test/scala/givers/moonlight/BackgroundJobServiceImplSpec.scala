@@ -2,7 +2,7 @@ package givers.moonlight
 
 import givers.moonlight.util.DateTimeFactory
 import givers.moonlight.v2.repository.BackgroundJobRepository
-import helpers.SimpleWorker
+import helpers.SimpleJobExecutor
 import org.mockito.scalatest.AsyncIdiomaticMockito
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpecLike
@@ -11,9 +11,7 @@ import java.time.{ZoneOffset, ZonedDateTime}
 import java.util.Date
 import scala.concurrent.Future
 
-class BackgroundJobServiceImplSpec extends AsyncWordSpecLike
-  with Matchers
-  with AsyncIdiomaticMockito {
+class BackgroundJobServiceImplSpec extends AsyncWordSpecLike with Matchers with AsyncIdiomaticMockito {
 
   "BackgroundJobServiceImpl.enqueue" should {
     "create now background job" in {
@@ -21,8 +19,9 @@ class BackgroundJobServiceImplSpec extends AsyncWordSpecLike
       val dateTimeFactory = mock[DateTimeFactory]
       val service = new BackgroundJobServiceImpl(repo, dateTimeFactory)
 
-      val jobData = SimpleWorker.Job("some work")
-      val jobId = SimpleWorker.idToJobId
+      val jobData = SimpleJobExecutor.JobData("some work")
+      val jobType = SimpleJobExecutor.jobType
+      val jobDesc = BackgroundJobDescription(jobType, jobData)
       val now = Date.from(ZonedDateTime.of(2022, 6, 27, 13, 46, 10, 4, ZoneOffset.UTC).toInstant)
       val shouldRunAt = Date.from(ZonedDateTime.of(2022, 6, 28, 0, 0, 0, 0, ZoneOffset.UTC).toInstant)
       val priority = 5
@@ -37,7 +36,7 @@ class BackgroundJobServiceImplSpec extends AsyncWordSpecLike
         status = BackgroundJob.Status.Pending,
         error = "",
         tryCount = 0,
-        jobType = jobId.value,
+        jobType = jobType.id,
         paramsInJsonString = """{"data":"some work"}""",
         priority = priority
       )
@@ -47,8 +46,8 @@ class BackgroundJobServiceImplSpec extends AsyncWordSpecLike
       repo.enqueue(expectedBackgroundJob) returns Future.successful(expectedCreatedBackgroundJob)
       dateTimeFactory.now returns now
 
-      service.enqueue(shouldRunAt, priority, jobData).map {
-        result => result shouldBe expectedCreatedBackgroundJob
+      service.enqueue(jobDesc, Some(shouldRunAt), BackgroundJobPriority.HIGH).map { result =>
+        result shouldBe expectedCreatedBackgroundJob
       }
     }
   }
