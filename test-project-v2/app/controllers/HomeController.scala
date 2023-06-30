@@ -50,8 +50,8 @@ class HomeController @Inject()(
             status = BackgroundJob.Status.Pending,
             error = "",
             tryCount = 0,
-            jobType = SimpleExecutor.jobType.id,
-            paramsInJsonString = SimpleExecutor.jobType.serDe.serialize(SimpleExecutor.Job(param.data)),
+            jobType = SimpleExecutor.Type.id,
+            paramsInJsonString = SimpleExecutor.Type.serDe.serialize(SimpleExecutor.Job(param.data)),
             priority = param.priority
           ))
           .map { _ => Redirect("/") }

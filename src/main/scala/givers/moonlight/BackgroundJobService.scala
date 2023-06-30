@@ -24,6 +24,8 @@ case class BackgroundJobDescription[IN](jobType: JobType[IN], jobIn: IN) {
 trait BackgroundJobService {
 
   /**
+   * Enqueue background job
+   *
    * @param job
    *   job with input
    * @param delayTo

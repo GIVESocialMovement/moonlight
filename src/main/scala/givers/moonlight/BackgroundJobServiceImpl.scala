@@ -3,7 +3,6 @@ package givers.moonlight
 import com.google.inject.{Inject, Singleton}
 import givers.moonlight.util.DateTimeFactory
 import givers.moonlight.v2.repository.BackgroundJobRepository
-import play.api.libs.json.OFormat
 
 import java.util.Date
 import scala.concurrent.{ExecutionContext, Future}

@@ -2,14 +2,14 @@ package executors
 
 import akka.actor.ActorSystem
 import com.google.inject.{Inject, Singleton}
-import givers.moonlight.{JobExecutor, JobInSerDe, JobType}
+import givers.moonlight.{JobExecutor, JobTypeJson}
 import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
 class SimpleExecutor @Inject()(implicit ec: ExecutionContext, actorSystem: ActorSystem)
-    extends JobExecutor(SimpleExecutor.jobType) {
+    extends JobExecutor(SimpleExecutor.Type) {
 
   private val blocking = actorSystem.dispatchers.lookup("akka.actor.blocking-dispatcher")
 
@@ -44,5 +44,5 @@ class SimpleExecutor @Inject()(implicit ec: ExecutionContext, actorSystem: Actor
 object SimpleExecutor {
   case class Job(data: String)
 
-  val jobType: JobType[Job] = JobType("Simple", JobInSerDe.json(Json.format[Job]))
+  case object Type extends JobTypeJson[Job]("Simple")(Json.format)
 }

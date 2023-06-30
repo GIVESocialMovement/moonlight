@@ -6,7 +6,7 @@ import com.codahale.metrics.MetricRegistry
 import givers.moonlight.util.DateTimeFactory
 import givers.moonlight.util.RichDate.RichDate
 import givers.moonlight.v2.repository.BackgroundJobRepository
-import givers.moonlight.{JobExecutor, JobInSerDe, JobType}
+import givers.moonlight.{JobExecutor, JobInSerDe, JobType, JobTypeJson}
 import helpers.BackgroundJobFixture
 import org.mockito.scalatest.AsyncIdiomaticMockito
 import org.scalatest.Succeeded
@@ -24,13 +24,14 @@ import scala.util.Random
 import scala.util.control.NoStackTrace
 
 class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdiomaticMockito with BackgroundJobFixture {
+
   object Executor1 {
     case class JobData(shouldSucceed: Boolean)
 
-    val jobType: JobType[JobData] = JobType("Executor1", JobInSerDe.json(Json.format[JobData]))
+    case object Type extends JobTypeJson[Executor1.JobData]("Executor1")(Json.format)
   }
 
-  class Executor1() extends JobExecutor(Executor1.jobType) {
+  class Executor1 extends JobExecutor(Executor1.Type) {
     override def run(data: Executor1.JobData): Future[Unit] = {
       Option
         .when(data.shouldSucceed)(())

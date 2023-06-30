@@ -8,8 +8,6 @@ Moonlight is a simple delayed job (or, in other words, background job) framework
 
 Here are important notes:
 * Moonlight uses Heroku's Postgresql through Slick. This requires you to configure Slick correctly.
-* No concurrency. No lock. Moonlight can only have one worker.
-* Support retrying up to 3 times. Retry happens one hour later after a failure.
 * Use JSON to serialize/deserialize job's params.
 
 At [GIVE.asia](https://give.asia), we've built Moonlight because we wanted a delayed job framework for moderate load.
@@ -49,8 +47,8 @@ You can define a delayed job by providing `WorkerSpec` which allows you to speci
 
 ```
 @Singleton
-class SimpleExecutor @Inject()()
-    extends JobExecutor(SimpleExecutor.jobType) {
+class SimpleExecutor @Inject()(implicit ec: ExecutionContext)
+    extends JobExecutor(SimpleExecutor.Type) {
 
   override def run(data: SimpleExecutor.Job): Future[Unit] = Future.successful(())
 }
@@ -58,7 +56,7 @@ class SimpleExecutor @Inject()()
 object SimpleExecutor {
   case class Job(data: String)
 
-  val jobType: JobType[Job] = JobType("SimpleAsync", JobInSerDe.json(Json.format[Job]))
+  case object Type extends JobTypeJson[Job]("Simple")(Json.format)
 }
 ```
 

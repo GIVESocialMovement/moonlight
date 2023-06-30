@@ -3,7 +3,7 @@ package givers.moonlight.v2.repository
 import givers.moonlight.BackgroundJob.Status
 import givers.moonlight.persistence.table.BackgroundJobTableComponent
 import givers.moonlight.util.RichDate.RichDate
-import givers.moonlight.{BackgroundJob, BackgroundJobDescription, JobInSerDe, JobType}
+import givers.moonlight.{BackgroundJob, JobInSerDe, JobType, JobTypeJson}
 import helpers.{DatabaseSchemaSupport, DatabaseSpec, H2SlickJdbcProfile}
 import org.mockito.scalatest.AsyncIdiomaticMockito
 import org.scalatest.matchers.should.Matchers
@@ -32,11 +32,6 @@ class BackgroundJobJdbcRepositorySpec
     tables
   )
 
-
-  case class JobExampleParam(campaignId: Long, oneMoreId: String)
-  private implicit val jsonFormat: OFormat[JobExampleParam] = Json.format[JobExampleParam]
-
-  private implicit val jobType: JobType[JobExampleParam] = JobType[JobExampleParam]("example", JobInSerDe.json)
   private val priority = 1
 
   private val nowDate = new Date(123456789)
@@ -51,7 +46,7 @@ class BackgroundJobJdbcRepositorySpec
     status = BackgroundJob.Status.Pending,
     error = "",
     tryCount = 0,
-    jobType = jobType.id,
+    jobType = "example",
     paramsInJsonString = """{"campaignId":444,"oneMoreId":"555"}""",
     priority = priority
   )

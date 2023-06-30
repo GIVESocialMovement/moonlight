@@ -20,8 +20,7 @@ class BackgroundJobServiceImplSpec extends AsyncWordSpecLike with Matchers with 
       val service = new BackgroundJobServiceImpl(repo, dateTimeFactory)
 
       val jobData = SimpleJobExecutor.JobData("some work")
-      val jobType = SimpleJobExecutor.jobType
-      val jobDesc = BackgroundJobDescription(jobType, jobData)
+      val jobDesc = SimpleJobExecutor.Type.desc(jobData)
       val now = Date.from(ZonedDateTime.of(2022, 6, 27, 13, 46, 10, 4, ZoneOffset.UTC).toInstant)
       val shouldRunAt = Date.from(ZonedDateTime.of(2022, 6, 28, 0, 0, 0, 0, ZoneOffset.UTC).toInstant)
       val priority = 5
@@ -36,7 +35,7 @@ class BackgroundJobServiceImplSpec extends AsyncWordSpecLike with Matchers with 
         status = BackgroundJob.Status.Pending,
         error = "",
         tryCount = 0,
-        jobType = jobType.id,
+        jobType = SimpleJobExecutor.Type.id,
         paramsInJsonString = """{"data":"some work"}""",
         priority = priority
       )

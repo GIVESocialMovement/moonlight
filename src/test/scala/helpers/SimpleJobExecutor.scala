@@ -1,14 +1,14 @@
 package helpers
 
 import com.google.inject.{Inject, Singleton}
-import givers.moonlight.{JobExecutor, JobInSerDe, JobType}
+import givers.moonlight.{JobExecutor, JobTypeJson}
 import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContext, Future}
 
 @Singleton
-class SimpleJobExecutor @Inject()(implicit executionContext: ExecutionContext)
-  extends JobExecutor(SimpleJobExecutor.jobType) {
+class SimpleJobExecutor @Inject() (implicit executionContext: ExecutionContext)
+    extends JobExecutor(SimpleJobExecutor.Type) {
 
   override def run(data: SimpleJobExecutor.JobData): Future[Unit] = {
     Future {
@@ -22,5 +22,5 @@ class SimpleJobExecutor @Inject()(implicit executionContext: ExecutionContext)
 object SimpleJobExecutor {
   case class JobData(data: String)
 
-  val jobType: JobType[JobData] = JobType("Simple", JobInSerDe.json(Json.format[JobData]))
+  case object Type extends JobTypeJson[SimpleJobExecutor.JobData]("Simple")(Json.format)
 }
