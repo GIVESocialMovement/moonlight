@@ -58,3 +58,11 @@ publishMavenStyle := true
 Test / publishArtifact := false
 
 publishTo := sonatypePublishToBundle.value
+
+coverageFailOnMinimum := false
+coverageMinimumStmtTotal := 70
+coverageMinimumBranchTotal := 70
+coverageMinimumStmtPerPackage := 70
+coverageMinimumBranchPerPackage := 70
+coverageMinimumStmtPerFile := 70
+coverageMinimumBranchPerFile := 70
