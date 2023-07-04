@@ -1,14 +1,13 @@
 package givers.moonlight.v2.repository
 
+import givers.moonlight.BackgroundJob
 import givers.moonlight.BackgroundJob.Status
 import givers.moonlight.persistence.table.BackgroundJobTableComponent
 import givers.moonlight.util.RichDate.RichDate
-import givers.moonlight.{BackgroundJob, JobInSerDe, JobType, JobTypeJson}
 import helpers.{DatabaseSchemaSupport, DatabaseSpec, H2SlickJdbcProfile}
 import org.mockito.scalatest.AsyncIdiomaticMockito
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpecLike
-import play.api.libs.json.{Json, OFormat}
 
 import java.util.Date
 import scala.concurrent.Future
@@ -399,6 +398,32 @@ class BackgroundJobJdbcRepositorySpec
         removedCount shouldBe 2
 
         dbContent.map(_.id) should contain theSameElementsAs Seq(j1Ins, j2Ins, j5Ins, j6Ins, j7Ins, j8Ins).map(_.id)
+      }
+    }
+  }
+
+  "BackgroundJobJdbcRepository.count" should {
+    "return count" in {
+      for {
+        _ <- insertJob(jobExample)
+        _ <- insertJob(jobExample.copy(shouldRunAt = nowDate.add(1.minute)))
+        _ <- insertJob(jobExample)
+        count <- repo.count
+      } yield {
+        count shouldBe 3
+      }
+    }
+  }
+
+  "BackgroundJobJdbcRepository.countPendingJobReadyForStart" should {
+    "return count jobs ready for start" in {
+      for {
+        _ <- insertJob(jobExample)
+        _ <- insertJob(jobExample.copy(shouldRunAt = nowDate.add(1.minute)))
+        _ <- insertJob(jobExample)
+        count <- repo.countPendingJobReadyForStart(nowDate)
+      } yield {
+        count shouldBe 2
       }
     }
   }

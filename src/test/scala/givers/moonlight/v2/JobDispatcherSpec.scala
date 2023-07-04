@@ -41,6 +41,72 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
     }
   }
 
+  class TestScheduler(schedulerCancel: Cancellable) extends Scheduler {
+    def scheduleOnce(delay: FiniteDuration, runnable: Runnable)(implicit
+      executor: ExecutionContext
+    ): Cancellable = {
+      runnable.run()
+
+      schedulerCancel
+    }
+
+    def scheduleAtFixedRate(initialDelay: FiniteDuration, interval: FiniteDuration)(runnable: Runnable)(implicit
+      executor: ExecutionContext
+    ): Cancellable = {
+      runnable.run()
+
+      schedulerCancel
+    }
+
+    override def scheduleOnce(delay: Duration, runnable: Runnable, executor: ExecutionContext): Cancellable = ???
+
+    override def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(runnable: Runnable)(
+      implicit executor: ExecutionContext
+    ): Cancellable = ???
+
+    override def scheduleWithFixedDelay(
+      initialDelay: Duration,
+      delay: Duration,
+      runnable: Runnable,
+      executor: ExecutionContext
+    ): Cancellable = ???
+
+    override def scheduleAtFixedRate(
+      initialDelay: Duration,
+      interval: Duration,
+      runnable: Runnable,
+      executor: ExecutionContext
+    ): Cancellable = ???
+  }
+
+  "JobDispatcher" should {
+    "throw JobTypeExecutorAlreadyExists" in {
+      val repo = mock[BackgroundJobRepository]
+      implicit val injector: Injector = mock[Injector]
+      implicit val scheduler: Scheduler = new TestScheduler(mock[Cancellable])
+      implicit val dateTimeFactory: DateTimeFactory = mock[DateTimeFactory]
+      implicit val random: Random = mock[Random]
+      val settings = MoonlightSettings(
+        parallelism = 1,
+        pauseDurationWhenNoJobs = 1.minute,
+        maintenanceInterval = 1.hour,
+        countMetricsCollectionInterval = 5.seconds,
+        betweenRunAttemptInterval = 30.minutes,
+        maxJobRetries = 3,
+        jobRunTimeout = 1.second,
+        completedJobsTtl = 90.days,
+        executors = Seq(new Executor1, new Executor1)
+      )
+
+      an[JobTypeExecutorAlreadyExists] should be thrownBy new JobDispatcher(
+        repo,
+        settings,
+        dateTimeFactory,
+        new MetricRegistry
+      )
+    }
+  }
+
   "JobDispatcher.runLoop" should {
     "run jobs" in {
       val parallelism = 2
@@ -70,46 +136,8 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
       val schedulerCancel = mock[Cancellable]
       schedulerCancel.cancel() returns true
 
-      class TestScheduler extends Scheduler {
-        def scheduleOnce(delay: FiniteDuration, runnable: Runnable)(implicit
-          executor: ExecutionContext
-        ): Cancellable = {
-          runnable.run()
-
-          schedulerCancel
-        }
-
-        def scheduleAtFixedRate(initialDelay: FiniteDuration, interval: FiniteDuration)(runnable: Runnable)(implicit
-          executor: ExecutionContext
-        ): Cancellable = {
-          runnable.run()
-
-          schedulerCancel
-        }
-
-        override def scheduleOnce(delay: Duration, runnable: Runnable, executor: ExecutionContext): Cancellable = ???
-
-        override def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(runnable: Runnable)(
-          implicit executor: ExecutionContext
-        ): Cancellable = ???
-
-        override def scheduleWithFixedDelay(
-          initialDelay: Duration,
-          delay: Duration,
-          runnable: Runnable,
-          executor: ExecutionContext
-        ): Cancellable = ???
-
-        override def scheduleAtFixedRate(
-          initialDelay: Duration,
-          interval: Duration,
-          runnable: Runnable,
-          executor: ExecutionContext
-        ): Cancellable = ???
-      }
-
       implicit val injector: Injector = mock[Injector]
-      implicit val scheduler: Scheduler = new TestScheduler
+      implicit val scheduler: Scheduler = new TestScheduler(schedulerCancel)
       implicit val dateTimeFactory: DateTimeFactory = mock[DateTimeFactory]
       implicit val random: Random = mock[Random]
 
