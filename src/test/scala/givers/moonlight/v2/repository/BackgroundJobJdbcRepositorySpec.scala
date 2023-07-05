@@ -1,14 +1,13 @@
 package givers.moonlight.v2.repository
 
+import givers.moonlight.BackgroundJob
 import givers.moonlight.BackgroundJob.Status
 import givers.moonlight.persistence.table.BackgroundJobTableComponent
 import givers.moonlight.util.RichDate.RichDate
-import givers.moonlight.{BackgroundJob, JobId}
 import helpers.{DatabaseSchemaSupport, DatabaseSpec, H2SlickJdbcProfile}
 import org.mockito.scalatest.AsyncIdiomaticMockito
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpecLike
-import play.api.libs.json.{Json, OFormat}
 
 import java.util.Date
 import scala.concurrent.Future
@@ -32,11 +31,6 @@ class BackgroundJobJdbcRepositorySpec
     tables
   )
 
-  case class JobExampleParam(campaignId: Long, oneMoreId: String) extends givers.moonlight.Job
-
-  private implicit val jobId: JobId[JobExampleParam] = JobId[JobExampleParam]("example")
-  private implicit val jsonFormat: OFormat[JobExampleParam] = Json.format[JobExampleParam]
-  private val param = JobExampleParam(444, "555")
   private val priority = 1
 
   private val nowDate = new Date(123456789)
@@ -51,7 +45,7 @@ class BackgroundJobJdbcRepositorySpec
     status = BackgroundJob.Status.Pending,
     error = "",
     tryCount = 0,
-    jobType = jobId.value,
+    jobType = "example",
     paramsInJsonString = """{"campaignId":444,"oneMoreId":"555"}""",
     priority = priority
   )
@@ -62,7 +56,7 @@ class BackgroundJobJdbcRepositorySpec
   "BackgroundJobJdbcRepository.enqueue" should {
     "enqueue a job" in {
       for {
-        savedJob <- repo.enqueue(BackgroundJob.forEnqueue(nowDate, priority, param))
+        savedJob <- repo.enqueue(jobExample)
         dbContent <- db.run(tables.backgroundJobs.result)
       } yield {
         val expectedJob = jobExample.copy(id = savedJob.id, createdAt = savedJob.createdAt)
@@ -404,6 +398,32 @@ class BackgroundJobJdbcRepositorySpec
         removedCount shouldBe 2
 
         dbContent.map(_.id) should contain theSameElementsAs Seq(j1Ins, j2Ins, j5Ins, j6Ins, j7Ins, j8Ins).map(_.id)
+      }
+    }
+  }
+
+  "BackgroundJobJdbcRepository.count" should {
+    "return count" in {
+      for {
+        _ <- insertJob(jobExample)
+        _ <- insertJob(jobExample.copy(shouldRunAt = nowDate.add(1.minute)))
+        _ <- insertJob(jobExample)
+        count <- repo.count
+      } yield {
+        count shouldBe 3
+      }
+    }
+  }
+
+  "BackgroundJobJdbcRepository.countPendingJobReadyForStart" should {
+    "return count jobs ready for start" in {
+      for {
+        _ <- insertJob(jobExample)
+        _ <- insertJob(jobExample.copy(shouldRunAt = nowDate.add(1.minute)))
+        _ <- insertJob(jobExample)
+        count <- repo.countPendingJobReadyForStart(nowDate)
+      } yield {
+        count shouldBe 2
       }
     }
   }

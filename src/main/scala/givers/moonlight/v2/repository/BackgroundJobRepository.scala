@@ -128,4 +128,8 @@ trait BackgroundJobRepository {
    * @return
    */
   def deleteJobsSucceededOrFailedBefore(date: Date): Future[Int]
+
+  def count: Future[Int]
+
+  def countPendingJobReadyForStart(now: Date): Future[Int]
 }

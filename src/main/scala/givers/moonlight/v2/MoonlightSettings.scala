@@ -1,13 +1,9 @@
 package givers.moonlight.v2
 
-import givers.moonlight.{AsyncSupport, AsyncWorkerSpec, Worker}
-import play.api.inject.Injector
+import givers.moonlight.JobExecutor
 
 import scala.concurrent.duration.{DurationLong, FiniteDuration}
 import scala.util.Random
-import scala.util.control.NoStackTrace
-
-class WorkerSearchException(msg: String) extends Exception(msg) with NoStackTrace
 
 /**
  * Moonlight app settings
@@ -18,6 +14,8 @@ class WorkerSearchException(msg: String) extends Exception(msg) with NoStackTrac
  *   pause between unsuccessful (when no jobs to run) job retrieval attempts
  * @param maintenanceInterval
  *   pause between job maintenance @see[[JobDispatcher.scheduleMaintenance]]
+ * @param countMetricsCollectionInterval
+ *   pause between metrics collection @see[[JobDispatcher.scheduleMetrics]]
  * @param betweenRunAttemptInterval
  *   how long to wait before trying to run a job again if it was failed
  * @param maxJobRetries
@@ -26,18 +24,19 @@ class WorkerSearchException(msg: String) extends Exception(msg) with NoStackTrac
  *   how long to wait for job finish
  * @param completedJobsTtl
  *   how long to keep Succeeded/Failed jobs in the database
- * @param workerSpecs
- *   a list of worker specifications
+ * @param executors
+ *   a list of executors
  */
 case class MoonlightSettings(
   parallelism: Int,
   pauseDurationWhenNoJobs: FiniteDuration,
   maintenanceInterval: FiniteDuration,
+  countMetricsCollectionInterval: FiniteDuration,
   betweenRunAttemptInterval: FiniteDuration,
   maxJobRetries: Int,
   jobRunTimeout: FiniteDuration,
   completedJobsTtl: FiniteDuration,
-  workerSpecs: Seq[AsyncWorkerSpec]
+  executors: Seq[JobExecutor[_]]
 ) {
 
   /**
@@ -53,31 +52,6 @@ case class MoonlightSettings(
     val delta = (millis * MoonlightSettings.durationRandomizationBound).toLong
 
     random.between(millis, millis + delta).millis
-  }
-
-  /**
-   * Get worker for a job type
-   *
-   * @param jobType
-   *   job type
-   * @param injector
-   *   DI system injector
-   * @return
-   */
-  def getWorkerByJobType(jobType: String)(implicit injector: Injector): Worker[_] with AsyncSupport[_] = {
-    workerSpecs
-      .filter(worker => worker.identifier == jobType || worker.previousIdentifiers.contains(jobType)) match {
-      case Nil =>
-        throw new WorkerSearchException(s"Unrecognized job type '$jobType'.")
-      case one :: Nil =>
-        injector.instanceOf(one.classTag)
-      case multiple =>
-        val names = multiple.map(_.classTag.getClass.getCanonicalName).mkString(", ")
-        throw new WorkerSearchException(
-          s"Ambiguous job type '$jobType'. " +
-            s"Multiple workers ($names) are defined to process this job type."
-        )
-    }
   }
 }
 

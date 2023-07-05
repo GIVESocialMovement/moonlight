@@ -78,6 +78,14 @@ class BackgroundJobJdbcRepository @Inject() (
       .take(1)
   )
 
+  private val pendingJobsReadyForStartCount = Compiled((now: Rep[Date]) =>
+    backgroundJobs
+      .filter(pendingJobsConditions(_, now))
+      .size
+  )
+
+  private val jobCount = Compiled(backgroundJobs.size)
+
   private val failedJobReadyForRetry = Compiled((maxAcceptableAttemptsCount: Rep[Int], lastAttemptAfter: Rep[Date]) =>
     backgroundJobs
       .filter(jobsReadyForRetryConditions(_, maxAcceptableAttemptsCount, lastAttemptAfter))
@@ -230,5 +238,13 @@ class BackgroundJobJdbcRepository @Inject() (
    */
   override def deleteJobsSucceededOrFailedBefore(date: Date): Future[Int] = {
     db.run(jobsSucceededOrFailedBeforeQuery(date).delete)
+  }
+
+  def count: Future[Int] = {
+    db.run(jobCount.result)
+  }
+
+  def countPendingJobReadyForStart(now: Date): Future[Int] = {
+    db.run(pendingJobsReadyForStartCount(now).result)
   }
 }

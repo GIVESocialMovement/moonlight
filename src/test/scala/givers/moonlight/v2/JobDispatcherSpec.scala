@@ -2,50 +2,108 @@ package givers.moonlight.v2
 
 import akka.actor.Cancellable
 import akka.actor.typed.Scheduler
+import com.codahale.metrics.MetricRegistry
 import givers.moonlight.util.DateTimeFactory
 import givers.moonlight.util.RichDate.RichDate
 import givers.moonlight.v2.repository.BackgroundJobRepository
-import givers.moonlight.{AsyncSupport, AsyncWorkerSpec, BackgroundJob, Worker, WorkerSpec}
+import givers.moonlight.{JobExecutor, JobInSerDe, JobType, JobTypeJson}
 import helpers.BackgroundJobFixture
 import org.mockito.scalatest.AsyncIdiomaticMockito
 import org.scalatest.Succeeded
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpecLike
 import play.api.inject.Injector
-import play.api.libs.json.{Json, OFormat}
+import play.api.libs.json.Json
 
 import java.time.{Duration, LocalTime, ZoneId, ZonedDateTime}
 import java.util.Date
+import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
-import scala.reflect.{ClassTag, classTag}
 import scala.util.Random
 import scala.util.control.NoStackTrace
 
 class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdiomaticMockito with BackgroundJobFixture {
 
-  object Worker1Spec extends WorkerSpec with AsyncWorkerSpec {
-    case class JobData(shouldSucceed: Boolean) extends givers.moonlight.Job
+  object Executor1 {
+    case class JobData(shouldSucceed: Boolean)
 
-    type Data = JobData
-    type Runner = Worker1
-
-    implicit val classTag: ClassTag[Runner] = ClassTag(classOf[Worker1])
-    implicit val jsonFormat: OFormat[JobData] = Json.format[JobData]
-
-    val identifier = "Worker1"
-    val previousIdentifiers: Set[String] = Set.empty
+    case object Type extends JobTypeJson[Executor1.JobData]("Executor1")(Json.format)
   }
 
-  class Worker1() extends Worker[Worker1Spec.JobData] with AsyncSupport[Worker1Spec.JobData] {
-    def run(param: Worker1Spec.JobData, job: BackgroundJob): Unit = ()
-
-    override def runAsync(job: BackgroundJob, data: Worker1Spec.JobData): Future[Unit] = {
+  class Executor1 extends JobExecutor(Executor1.Type) {
+    override def run(data: Executor1.JobData): Future[Unit] = {
       Option
         .when(data.shouldSucceed)(())
         .fold(Future.failed[Unit](new Exception("worker failure example") with NoStackTrace))(_ =>
           Future.successful(())
         )
+    }
+  }
+
+  class TestScheduler(schedulerCancel: Cancellable) extends Scheduler {
+    def scheduleOnce(delay: FiniteDuration, runnable: Runnable)(implicit
+      executor: ExecutionContext
+    ): Cancellable = {
+      runnable.run()
+
+      schedulerCancel
+    }
+
+    def scheduleAtFixedRate(initialDelay: FiniteDuration, interval: FiniteDuration)(runnable: Runnable)(implicit
+      executor: ExecutionContext
+    ): Cancellable = {
+      runnable.run()
+
+      schedulerCancel
+    }
+
+    override def scheduleOnce(delay: Duration, runnable: Runnable, executor: ExecutionContext): Cancellable = ???
+
+    override def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(runnable: Runnable)(
+      implicit executor: ExecutionContext
+    ): Cancellable = ???
+
+    override def scheduleWithFixedDelay(
+      initialDelay: Duration,
+      delay: Duration,
+      runnable: Runnable,
+      executor: ExecutionContext
+    ): Cancellable = ???
+
+    override def scheduleAtFixedRate(
+      initialDelay: Duration,
+      interval: Duration,
+      runnable: Runnable,
+      executor: ExecutionContext
+    ): Cancellable = ???
+  }
+
+  "JobDispatcher" should {
+    "throw JobTypeExecutorAlreadyExists" in {
+      val repo = mock[BackgroundJobRepository]
+      implicit val injector: Injector = mock[Injector]
+      implicit val scheduler: Scheduler = new TestScheduler(mock[Cancellable])
+      implicit val dateTimeFactory: DateTimeFactory = mock[DateTimeFactory]
+      implicit val random: Random = mock[Random]
+      val settings = MoonlightSettings(
+        parallelism = 1,
+        pauseDurationWhenNoJobs = 1.minute,
+        maintenanceInterval = 1.hour,
+        countMetricsCollectionInterval = 5.seconds,
+        betweenRunAttemptInterval = 30.minutes,
+        maxJobRetries = 3,
+        jobRunTimeout = 1.second,
+        completedJobsTtl = 90.days,
+        executors = Seq(new Executor1, new Executor1)
+      )
+
+      an[JobTypeExecutorAlreadyExists] should be thrownBy new JobDispatcher(
+        repo,
+        settings,
+        dateTimeFactory,
+        new MetricRegistry
+      )
     }
   }
 
@@ -67,66 +125,33 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
         parallelism = parallelism,
         pauseDurationWhenNoJobs = 1.minute,
         maintenanceInterval = 1.hour,
+        countMetricsCollectionInterval = 5.seconds,
         betweenRunAttemptInterval = 30.minutes,
         maxJobRetries = 3,
         jobRunTimeout = 1.second,
         completedJobsTtl = 90.days,
-        workerSpecs = Seq(Worker1Spec)
+        executors = Seq(new Executor1)
       )
 
       val schedulerCancel = mock[Cancellable]
       schedulerCancel.cancel() returns true
 
-      class TestScheduler extends Scheduler {
-        def scheduleOnce(delay: FiniteDuration, runnable: Runnable)(implicit
-          executor: ExecutionContext
-        ): Cancellable = {
-          runnable.run()
-
-          schedulerCancel
-        }
-
-        def scheduleAtFixedRate(initialDelay: FiniteDuration, interval: FiniteDuration)(runnable: Runnable)(implicit
-          executor: ExecutionContext
-        ): Cancellable = {
-          runnable.run()
-
-          schedulerCancel
-        }
-
-        override def scheduleOnce(delay: Duration, runnable: Runnable, executor: ExecutionContext): Cancellable = ???
-
-        override def scheduleWithFixedDelay(initialDelay: FiniteDuration, delay: FiniteDuration)(runnable: Runnable)(
-          implicit executor: ExecutionContext
-        ): Cancellable = ???
-
-        override def scheduleWithFixedDelay(
-          initialDelay: Duration,
-          delay: Duration,
-          runnable: Runnable,
-          executor: ExecutionContext
-        ): Cancellable = ???
-
-        override def scheduleAtFixedRate(
-          initialDelay: Duration,
-          interval: Duration,
-          runnable: Runnable,
-          executor: ExecutionContext
-        ): Cancellable = ???
-      }
-
       implicit val injector: Injector = mock[Injector]
-      implicit val scheduler: Scheduler = new TestScheduler
+      implicit val scheduler: Scheduler = new TestScheduler(schedulerCancel)
       implicit val dateTimeFactory: DateTimeFactory = mock[DateTimeFactory]
       implicit val random: Random = mock[Random]
 
-      val dispatcher = new JobDispatcher(repo, settings, dateTimeFactory)
+      val dispatcher = new JobDispatcher(repo, settings, dateTimeFactory, new MetricRegistry)
 
       dateTimeFactory.now returns currentDate
 
       // promise that will be completed when all jobs were retrieved
       // it's needed for proper synchronisation to avoid "wait-based" sync
       val allJobsWereUsed = Promise[Unit]
+
+      // simulates metrics
+      repo.countPendingJobReadyForStart(currentDate) returns Future.successful(1)
+      repo.count returns Future.successful(1)
 
       // simulates maintenance
       date.minusDays(90).toLocalDate.atTime(LocalTime.MIDNIGHT).atZone(zoneId).toEpochSecond
@@ -146,13 +171,13 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
         .returns(
           Future.successful(
             Some(
-              jobOfType("Worker1", firstId)
+              jobOfType("Executor1", firstId)
                 .copy(paramsInJsonString = """{"shouldSucceed": true}""")
             )
           )
         )
         // there is no worker for this job so it will just log error
-        .andThen(Future.successful(Some(jobOfType("Worker2", secondId))))
+        .andThen(Future.successful(Some(jobOfType("Executor2", secondId))))
         .andThenAnswer {
           Future.successful(None)
         }
@@ -164,7 +189,7 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
         .returns(
           Future.successful(
             Some(
-              jobOfType("Worker1", thirdId)
+              jobOfType("Executor1", thirdId)
                 .copy(paramsInJsonString = """{"shouldSucceed": false}""")
             )
           )
@@ -173,7 +198,7 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
         .andThen(
           Future.successful(
             Some(
-              jobOfType("Worker1", fourthId)
+              jobOfType("Executor1", fourthId)
                 .copy(paramsInJsonString = """{"shouldSucceed": false}""")
             )
           )
@@ -197,7 +222,6 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
 
       repo.markJobAsSucceed(firstId, *) returns Future.successful(())
 
-      injector.instanceOf[Worker1](classTag[Worker1]) returns new Worker1
       random.between(60000L, 66000L) returns 61000L
 
       val (cancelLoop, loopFuture) = dispatcher.runLoop()
