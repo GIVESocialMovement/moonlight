@@ -44,5 +44,5 @@ class SimpleExecutor @Inject()(implicit ec: ExecutionContext, actorSystem: Actor
 object SimpleExecutor {
   case class Job(data: String)
 
-  case object Type extends JobTypeJson[Job]("Simple")(Json.format)
+  implicit case object Type extends JobTypeJson[Job]("Simple")(Json.format)
 }

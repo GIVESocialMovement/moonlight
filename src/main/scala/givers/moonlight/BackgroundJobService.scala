@@ -1,10 +1,10 @@
 package givers.moonlight
 
 import com.google.inject.ImplementedBy
-import play.api.libs.json.OFormat
 
 import java.util.Date
 import scala.concurrent.Future
+import scala.language.implicitConversions
 
 case class BackgroundJobPriority(intRepresentation: Int)
 
@@ -18,6 +18,29 @@ object BackgroundJobPriority {
 
 case class BackgroundJobDescription[IN](jobType: JobType[IN], jobIn: IN) {
   def serializeIn: String = jobType.serDe.serialize(jobIn)
+}
+
+object BackgroundJobDescription {
+  implicit class JobInDescriptor[IN](in: IN) {
+    def describe(jobType: JobType[IN]): BackgroundJobDescription[IN] = {
+      BackgroundJobDescription(jobType, in)
+    }
+  }
+
+  object Implicits {
+
+    /**
+     * Implicit descriptor !! Use it only when IN class has only one executor. Otherwise use JobInDescriptor
+     * @param in
+     *   job in data
+     * @tparam IN
+     *   job in type
+     * @return
+     */
+    implicit def describeImplicitly[IN: JobType](in: IN): BackgroundJobDescription[IN] = {
+      BackgroundJobDescription(implicitly[JobType[IN]], in)
+    }
+  }
 }
 
 @ImplementedBy(classOf[BackgroundJobServiceImpl])
