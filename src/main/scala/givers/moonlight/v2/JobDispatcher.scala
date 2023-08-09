@@ -2,8 +2,9 @@ package givers.moonlight.v2
 
 import akka.actor.Cancellable
 import akka.actor.typed.Scheduler
-import com.codahale.metrics.{MetricRegistry, SettableGauge}
+import com.codahale.metrics.MetricRegistry
 import com.google.inject.Singleton
+import givers.moonlight.util.Metrics.MetricRegistryOps
 import givers.moonlight.{BackgroundJob, JobExecutor}
 import givers.moonlight.util.{DateTimeFactory, Metrics}
 import givers.moonlight.util.RichDate._
@@ -21,8 +22,7 @@ import scala.util.control.NoStackTrace
 import scala.util.{Failure, Random, Success, Try}
 
 case class JobExecutionError(realCause: Throwable) extends Exception("Job execution error", realCause)
-case class JobTypeExecutorAlreadyExists(typeId: String)
-    extends Exception(s"Job executor for $typeId already exists")
+case class JobTypeExecutorAlreadyExists(typeId: String) extends Exception(s"Job executor for $typeId already exists")
 
 case class JobExecutorNotFound(typeId: String)
     extends Exception(s"Job executor for $typeId not found")
@@ -55,8 +55,8 @@ class JobDispatcher @Inject() (
 )(implicit executionContext: ExecutionContext, injector: Injector, scheduler: Scheduler, random: Random) {
   private[this] val logger = Logger(this.getClass)
 
-  private val readyToStartCount = metricRegistry.gauge[SettableGauge[Int]](Metrics.jobDispatcher.jobsReadyToStart)
-  private val jobsOverall = metricRegistry.gauge[SettableGauge[Int]](Metrics.jobDispatcher.jobsOverall)
+  private val readyToStartCount = metricRegistry.settableGauge[Int](Metrics.jobDispatcher.jobsReadyToStart)
+  private val jobsOverall = metricRegistry.settableGauge[Int](Metrics.jobDispatcher.jobsOverall)
 
   private val maintenanceDeleteOldTimer = metricRegistry.timer(Metrics.jobDispatcher.maintenanceOldJobs)
   private val maintenanceDeleteOldErrorCount = metricRegistry.counter(Metrics.jobDispatcher.maintenanceOldJobsErrors)

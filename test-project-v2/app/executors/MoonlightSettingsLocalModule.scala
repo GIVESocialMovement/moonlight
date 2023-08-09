@@ -1,6 +1,6 @@
 package executors
 
-import com.codahale.metrics.{MetricAttribute, MetricFilter, MetricRegistry}
+import com.codahale.metrics.{MetricAttribute, MetricFilter, MetricRegistry, NoopMetricRegistry}
 import com.codahale.metrics.graphite.{Graphite, GraphiteReporter}
 import com.google.inject.{Inject, Provider}
 import givers.moonlight.v2.MoonlightSettings
@@ -15,40 +15,8 @@ import scala.jdk.CollectionConverters.SetHasAsJava
 
 class MoonlightSettingsLocalModule extends play.api.inject.Module {
   def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
-      val graphite = new Graphite(new InetSocketAddress("localhost", 2003))
-
-      val registry = new MetricRegistry()
-      val reporter = GraphiteReporter
-        .forRegistry(registry)
-        .disabledMetricAttributes(
-          Set(
-            // list of metrics, not used right now
-            MetricAttribute.MAX,
-            MetricAttribute.MEAN,
-            MetricAttribute.MIN,
-            MetricAttribute.STDDEV,
-            MetricAttribute.P50,
-            MetricAttribute.P75,
-            // MetricAttribute.P95,
-            MetricAttribute.P98,
-            // MetricAttribute.P99,
-            MetricAttribute.P999,
-            // MetricAttribute.COUNT,
-            MetricAttribute.M1_RATE,
-            MetricAttribute.M5_RATE,
-            MetricAttribute.M15_RATE,
-            MetricAttribute.MEAN_RATE
-          ).asJava
-        )
-        .prefixedWith(s"giveasia.dev.test-project")
-        .convertRatesTo(TimeUnit.SECONDS)
-        .convertDurationsTo(TimeUnit.MILLISECONDS)
-        .filter(MetricFilter.ALL)
-        .build(graphite)
-
-      reporter.start(1000, TimeUnit.MILLISECONDS)
     Seq(
-      bind[MetricRegistry].toInstance(registry),
+      bind[MetricRegistry].toInstance(new NoopMetricRegistry),
       bind[MoonlightSettings].toProvider[MoonlightSettingsLocalProvider]
     )
   }
