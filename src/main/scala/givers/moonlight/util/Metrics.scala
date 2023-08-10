@@ -1,5 +1,7 @@
 package givers.moonlight.util
 
+import com.codahale.metrics.{DefaultSettableGauge, MetricRegistry, NoopMetricRegistry, SettableGauge}
+
 /**
  * Registry of all metric names
  */
@@ -17,8 +19,17 @@ object Metrics {
   }
 
   object executor {
-    def duration(jobType: String) = s"executor.${jobType.toLowerCase}.execution"
-    def succeeded(jobType: String) = s"executor.${jobType.toLowerCase}.succeeded"
-    def failed(jobType: String) = s"executor.${jobType.toLowerCase}.failed"
+    def duration(jobType: String) = s"executor.$jobType.execution"
+    def succeeded(jobType: String) = s"executor.$jobType.succeeded"
+    def failed(jobType: String) = s"executor.$jobType.failed"
+  }
+
+  implicit class MetricRegistryOps(val registry: MetricRegistry) extends AnyVal {
+    def settableGauge[T](name: String): SettableGauge[T] = {
+      registry match {
+        case _: NoopMetricRegistry => new DefaultSettableGauge[T]
+        case other => other.gauge[SettableGauge[T]](name)
+      }
+    }
   }
 }
