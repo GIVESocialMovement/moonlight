@@ -24,7 +24,7 @@ organization := "io.github.givesocialmovement"
 
 name := "play-moonlight"
 
-version := "1.0.3"
+version := "1.0.4"
 
 Test / parallelExecution := false
 

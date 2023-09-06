@@ -55,6 +55,7 @@ class JobDispatcher @Inject() (
 )(implicit executionContext: ExecutionContext, injector: Injector, scheduler: Scheduler, random: Random) {
   private[this] val logger = Logger(this.getClass)
 
+  private val activeExecutorsCount = metricRegistry.settableGauge[Int](Metrics.jobDispatcher.activeExecutorsCount)
   private val readyToStartCount = metricRegistry.settableGauge[Int](Metrics.jobDispatcher.jobsReadyToStart)
   private val jobsOverall = metricRegistry.settableGauge[Int](Metrics.jobDispatcher.jobsOverall)
 
@@ -165,6 +166,7 @@ class JobDispatcher @Inject() (
 
     // the idea is to complete runPromise only when last executor is closed
     val executorsLeft = new AtomicInteger(settings.parallelism)
+    val activeExecutors = new AtomicInteger(0)
 
     def runForever(threadSeqId: Int): Unit = {
       Option.when(untilRunning.get())(()) match {
@@ -172,7 +174,12 @@ class JobDispatcher @Inject() (
           getJobReadyForStart
             .onComplete {
               case Success(Some(job)) =>
-                runJob(job, threadSeqId).foreach(_ => runForever(threadSeqId))
+                activeExecutorsCount.setValue(activeExecutors.incrementAndGet())
+                runJob(job, threadSeqId)
+                  .foreach { _ =>
+                    activeExecutorsCount.setValue(activeExecutors.decrementAndGet())
+                    runForever(threadSeqId)
+                  }
               // maybe db error
               case Failure(e) =>
                 logger.error("can't get job", e)
@@ -225,6 +232,9 @@ class JobDispatcher @Inject() (
    */
   private def runJob(job: BackgroundJob, threadSeqId: Int): Future[Unit] = {
     val startInMillis = Instant.now().toEpochMilli
+    def duration: Long = Instant.now().toEpochMilli - startInMillis
+
+    metricRegistry.counter(Metrics.executor.started(job.jobType)).inc()
 
     val startResult = for {
       executor <- Future.fromTry(
@@ -260,14 +270,13 @@ class JobDispatcher @Inject() (
             _ <- bgJobRepo.markJobAsSucceed(job.id, dateTimeFactory.now)
           } yield {
             logger.info(
-              s"#$threadSeqId executor ${executor.getClass.getSimpleName} with job ${job.id} finished successfully"
+              s"#$threadSeqId executor ${executor.getClass.getSimpleName} with job " +
+                s"${job.id} finished successfully. Took $duration millis"
             )
           }
 
           runFuture.onComplete { res =>
             timer.stop()
-            val duration = Instant.now().toEpochMilli - startInMillis
-            logger.info(s"#$threadSeqId job ${job.id} took $duration millis")
 
             res.foreach(_ => metricRegistry.counter(Metrics.executor.succeeded(job.jobType)).inc())
             res.failed.foreach(_ => metricRegistry.counter(Metrics.executor.failed(job.jobType)).inc())
@@ -280,21 +289,23 @@ class JobDispatcher @Inject() (
         case JobExecutionError(e) =>
           logger.error(
             s"#$threadSeqId error occurred while running the job " +
-              s"(id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}, tryCount=${job.tryCount}).",
+              s"(id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}, tryCount=${job.tryCount}). " +
+              s"Took $duration millis",
             e
           )
           bgJobRepo.markJobAsFailed(job.id, e, dateTimeFactory.now)
         case e: JobExecutorNotFound =>
           logger.error(
             s"#$threadSeqId error occurred while searching for executor " +
-              s"(id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}, tryCount=${job.tryCount})",
+              s"(id=${job.id}, type=${job.jobType}, params=${job.paramsInJsonString}, tryCount=${job.tryCount}). " +
+              s"Took $duration millis",
             e
           )
           bgJobRepo.markJobAsFailed(job.id, e, dateTimeFactory.now)
       }
       // in case of other error like db failure
       .recover { case e =>
-        logger.error(s"#$threadSeqId critical failure job $job failure", e)
+        logger.error(s"#$threadSeqId critical failure job $job failure. Took $duration millis", e)
         ()
       }
   }
