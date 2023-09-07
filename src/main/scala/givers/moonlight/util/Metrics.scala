@@ -7,6 +7,7 @@ import com.codahale.metrics.{DefaultSettableGauge, MetricRegistry, NoopMetricReg
  */
 object Metrics {
   object jobDispatcher {
+    val activeExecutorsCount = "job-dispatcher.jobs.active-executors-count"
     val jobsReadyToStart = "job-dispatcher.jobs.ready-to-start"
     val jobsOverall = "job-dispatcher.jobs.overall"
 
@@ -20,6 +21,7 @@ object Metrics {
 
   object executor {
     def duration(jobType: String) = s"executor.$jobType.execution"
+    def started(jobType: String) = s"executor.$jobType.started"
     def succeeded(jobType: String) = s"executor.$jobType.succeeded"
     def failed(jobType: String) = s"executor.$jobType.failed"
   }
