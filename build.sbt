@@ -1,6 +1,25 @@
-lazy val moonlight = project in file(".")
+import sbt.Keys.name
 
-scalaVersion := "2.13.8"
+Global / scalaVersion := "2.13.8"
+
+organization := "io.github.givesocialmovement"
+
+name := "play-moonlight"
+
+version := "1.1.0"
+
+lazy val macros = (project in file("macros"))
+  .settings(
+    libraryDependencies ++= Seq(
+      "org.scala-lang" % "scala-reflect" % scalaVersion.value,
+      Dependencies.quartz
+    ),
+    Compile / doc / sources := Nil,
+    Compile / packageDoc / publishArtifact := false
+  )
+
+lazy val moonlight = (project in file("."))
+  .dependsOn(macros)
 
 libraryDependencies ++= Seq(
   "com.typesafe.play" %% "play-slick" % "5.0.0" withSources () withJavadoc (),
@@ -11,6 +30,7 @@ libraryDependencies ++= Seq(
   "io.netty" % "netty-common" % "4.1.76.Final",
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.4",
   "io.dropwizard" % "dropwizard-metrics-graphite" % "2.1.4",
+  Dependencies.quartz,
   "com.typesafe.play" %% "play-slick-evolutions" % "5.0.0" % Test,
   "org.mockito" % "mockito-core" % "2.18.3" % Test,
   "com.lihaoyi" %% "utest" % "0.7.10" % Test,
@@ -19,12 +39,6 @@ libraryDependencies ++= Seq(
   "com.h2database" % "h2" % "2.1.210" % Test,
   "org.scalatest" %% "scalatest" % "3.2.11" % Test
 )
-
-organization := "io.github.givesocialmovement"
-
-name := "play-moonlight"
-
-version := "1.0.4"
 
 Test / parallelExecution := false
 
@@ -66,3 +80,4 @@ coverageMinimumStmtPerPackage := 70
 coverageMinimumBranchPerPackage := 70
 coverageMinimumStmtPerFile := 70
 coverageMinimumBranchPerFile := 70
+coverageExcludedFiles := ".*MoonlightApplication;.*MoonlightSettings"

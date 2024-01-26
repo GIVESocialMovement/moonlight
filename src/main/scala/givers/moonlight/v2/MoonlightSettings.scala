@@ -1,6 +1,7 @@
 package givers.moonlight.v2
 
 import givers.moonlight.JobExecutor
+import givers.moonlight.scheduled.SchedulerInput
 
 import scala.concurrent.duration.{DurationLong, FiniteDuration}
 import scala.util.Random
@@ -26,6 +27,8 @@ import scala.util.Random
  *   how long to keep Succeeded/Failed jobs in the database
  * @param executors
  *   a list of executors
+ * @param schedulerInputs
+ *   scheduler jobs
  */
 case class MoonlightSettings(
   parallelism: Int,
@@ -36,7 +39,8 @@ case class MoonlightSettings(
   maxJobRetries: Int,
   jobRunTimeout: FiniteDuration,
   completedJobsTtl: FiniteDuration,
-  executors: Seq[JobExecutor[_]]
+  executors: Seq[JobExecutor[_]],
+  schedulerInputs: Set[SchedulerInput[_]]
 ) {
 
   /**

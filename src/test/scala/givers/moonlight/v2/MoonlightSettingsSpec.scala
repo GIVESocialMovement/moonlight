@@ -3,15 +3,13 @@ package givers.moonlight.v2
 import org.mockito.scalatest.IdiomaticMockito
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AnyWordSpecLike
-import play.api.inject.Injector
 
 import scala.concurrent.duration.DurationInt
 import scala.util.Random
 
 class MoonlightSettingsSpec extends AnyWordSpecLike with Matchers with IdiomaticMockito {
-  private val settings = MoonlightSettings(1, 3.seconds, 0.seconds, 5.seconds, 0.seconds, 1, 0.seconds, 90.days, Seq.empty)
-
-  private implicit val injector: Injector = mock[Injector]
+  private val settings =
+    MoonlightSettings(1, 3.seconds, 0.seconds, 5.seconds, 0.seconds, 1, 0.seconds, 90.days, Seq.empty, Set.empty)
 
   "MoonlightSettings.pauseDurationWhenNoJobsRandomized" should {
     "return random pause" in {
