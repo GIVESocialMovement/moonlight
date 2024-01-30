@@ -4,10 +4,11 @@ Moonlight
 [![CircleCI](https://circleci.com/gh/GIVESocialMovement/moonlight/tree/master.svg?style=shield)](https://circleci.com/gh/GIVESocialMovement/moonlight/tree/master)
 [![codecov](https://codecov.io/gh/GIVESocialMovement/moonlight/branch/master/graph/badge.svg)](https://codecov.io/gh/GIVESocialMovement/moonlight)
 
-Moonlight is a simple delayed job (or, in other words, background job) framework for Playframework on Heroku.
+Moonlight is a simple delayed job (or, in other words, background job) framework for Playframework.
 
 Here are important notes:
-* Moonlight uses Heroku's Postgresql through Slick. This requires you to configure Slick correctly.
+
+* Moonlight uses Postgresql through Slick. This requires you to configure Slick correctly.
 * Use JSON to serialize/deserialize job's params.
 
 At [GIVE.asia](https://give.asia), we've built Moonlight because we wanted a delayed job framework for moderate load.
@@ -21,16 +22,15 @@ Usage
 
 The usage requires some degree of involvement.
 
-Please see a full working example in the folder `test-project` and the live demo here: https://moonlight-test.herokuapp.com.
+Please see a full working example in the folder `test-project` and the live demo
+here: https://moonlight-test.herokuapp.com.
 (The worker dyno isn't free, so it's off. Therefore, the job will be added but not processed).
-
 
 ### 1. Setup Postgresql's table
 
 We've provided a set of SQLs for creating/updating required schemas. Please see `conf/evolutions/default/1.sql`.
 
 Please apply the SQLs to your database.
-
 
 ### 2. Include Moonlight in your build.sbt
 
@@ -41,9 +41,10 @@ libraryDependencies += "givers.moonlight" %% "play-moonlight" % "x.x.x"
 
 The artifacts are hosted here: https://bintray.com/givers/maven/play-moonlight
 
-### 3. Create a executor
+### 3. Create an executor
 
-You can define a delayed job by providing `WorkerSpec` which allows you to specify params and job runner. Here's an example:
+You can define a delayed job by providing `WorkerSpec` which allows you to specify params and job runner. Here's an
+example:
 
 ```
 @Singleton
@@ -60,9 +61,23 @@ object SimpleExecutor {
 }
 ```
 
-### 4. Install Moonlight's module
+### 4. Create a scheduled job
 
-Create a module with defined `SimpleExecutor`:
+```
+class SimpleScheduledJob @Inject() (implicit val executionContext: ExecutionContext) extends ScheduledJob {
+  type IN = String
+    
+  private val logger = Logger(this.getClass)
+  override def run(input: IN): Future[Unit] = {
+    logger.info(s"[$input]")
+    Future.unit
+  }
+}
+```
+
+### 5. Install Moonlight's module
+
+Create a module with defined `SimpleExecutor` and `SimpleScheduledJob`:
 
 ```
 class MoonlightModule extends play.api.inject.Module {
@@ -76,7 +91,10 @@ class MoonlightModule extends play.api.inject.Module {
         maxJobRetries = 3,
         jobRunTimeout = 10.seconds,
         completedJobsTtl = (24 * 30).hours,
-        executors = Seq(simpleExecutor)
+        executors = Seq(simpleExecutor),
+        schedulerInputs = Set(
+          SchedulerInput[SimpleScheduledJob]("job1", cronExpression("0 * * * * ? *"), 10.seconds)
+        )
     ))
   )
 }
@@ -90,8 +108,7 @@ play.modules.enabled += "modules.MoonlightModule"
 slick.dbs.default.db.properties.url="postgres://user:pass@localhost:5432/database"
 ```
 
-
-### 5. Run Moonlight
+### 6. Run Moonlight
 
 You can run Moonlight locally with `sbt 'runMain givers.moonlight.v2.MoonlightApplication dev'`.
 

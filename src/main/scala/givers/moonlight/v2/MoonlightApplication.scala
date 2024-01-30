@@ -2,6 +2,7 @@ package givers.moonlight.v2
 
 import akka.Done
 import akka.actor.CoordinatedShutdown
+import givers.moonlight.scheduled.quartz.QuartzScheduler
 import play.api._
 import play.api.inject.guice.GuiceApplicationBuilder
 
@@ -34,19 +35,29 @@ trait MoonlightApplicationBase {
     // main app loop
     val (runLoopControl, runLoop) = dispatcher.runLoop()
 
-    runLoop.onComplete {
-      res =>
-        logger.info(s"app is completed with result $res. Stopping ...")
-        Play.stop(app)
+    runLoop.onComplete { res =>
+      logger.info(s"app is completed with result $res. Stopping ...")
+      Play.stop(app)
     }
 
-    app.injector.instanceOf[CoordinatedShutdown]
-      .addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "stop-main-loop") {
-        () =>
-          logger.info("cancelling run loop on shutdown")
-          runLoopControl.cancel()
+    val scheduler = app.injector.instanceOf[QuartzScheduler]
+    val cancelScheduler = scheduler.run()
 
-          runLoop.map(_ => Done)
+    app.injector
+      .instanceOf[CoordinatedShutdown]
+      .addTask(CoordinatedShutdown.PhaseBeforeServiceUnbind, "stop-main-loop") { () =>
+        logger.info("finishing run loop on app shutdown")
+        runLoopControl.cancel()
+
+        logger.info("finishing scheduler on app shutdown")
+        val schedulerShutdown = cancelScheduler()
+
+        for {
+          _ <- runLoop
+          _ = logger.info("run loop finished")
+          _ <- schedulerShutdown
+          _ = logger.info("scheduler finished")
+        } yield Done
       }
   }
 }
