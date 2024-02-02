@@ -1,21 +1,25 @@
 import sbt.Keys.name
+import sbt.Test
 
 Global / scalaVersion := "2.13.8"
 
-organization := "io.github.givesocialmovement"
+Global / organization := "io.github.givesocialmovement"
 
 name := "play-moonlight"
 
-version := "1.1.0"
+version := "1.1.1"
 
 lazy val macros = (project in file("macros"))
   .settings(
+    version := "1.1.0",
+    name := "play-moonlight-macros",
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-reflect" % scalaVersion.value,
       Dependencies.quartz
     ),
-    Compile / doc / sources := Nil,
-    Compile / packageDoc / publishArtifact := false
+    publishMavenStyle := true,
+    Test / publishArtifact := false,
+    publishTo := sonatypePublishToBundle.value
   )
 
 lazy val moonlight = (project in file("."))
@@ -50,20 +54,20 @@ ThisBuild / sonatypeCredentialHost := "s01.oss.sonatype.org"
 
 pomIncludeRepository := { _ => false }
 
-homepage := Some(url("https://github.com/GIVESocialMovement/moonlight"))
+Global / homepage := Some(url("https://github.com/GIVESocialMovement/moonlight"))
 
-scmInfo := Some(
+Global / scmInfo := Some(
   ScmInfo(
     url("https://github.com/GIVESocialMovement/moonlight"),
     "scm:git@github.com:GIVESocialMovement/moonlight.git"
   )
 )
 
-developers := List(
+Global / developers := List(
   Developer(id = "tanin", name = "tanin", email = "developers@giveasia.org", url = url("https://github.com/tanin47"))
 )
 
-licenses := Seq(("MIT", url("http://opensource.org/licenses/MIT")))
+Global / licenses := Seq(("MIT", url("http://opensource.org/licenses/MIT")))
 
 testFrameworks += new TestFramework("utest.runner.Framework")
 
