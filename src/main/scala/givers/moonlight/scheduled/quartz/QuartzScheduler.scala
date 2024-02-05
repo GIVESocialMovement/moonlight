@@ -1,7 +1,13 @@
 package givers.moonlight.scheduled.quartz
 
+import com.codahale.metrics.MetricRegistry
 import givers.moonlight.scheduled.Scheduler.StopScheduler
-import givers.moonlight.scheduled.quartz.QuartzScheduledJob.{JOB_DATA_IN_ARG, JOB_RUNNER_ARG, JOB_TIMEOUT}
+import givers.moonlight.scheduled.quartz.QuartzScheduledJob.{
+  JOB_DATA_IN_ARG,
+  JOB_RUNNER_ARG,
+  JOB_TIMEOUT,
+  METRIC_REGISTRY
+}
 import givers.moonlight.scheduled.{CronSchedule, Schedule, Scheduler}
 import givers.moonlight.v2.MoonlightSettings
 import org.quartz.CronScheduleBuilder.cronSchedule
@@ -18,10 +24,16 @@ import scala.concurrent.{ExecutionContext, Future}
  *
  * @param settings
  *   moonlight settings
+ * @param metricRegistry
+ *   metrics registry
  * @param ec
  *   execution context
  */
-class QuartzScheduler @Inject() (settings: MoonlightSettings, injector: Injector)(implicit ec: ExecutionContext)
+class QuartzScheduler @Inject() (
+  settings: MoonlightSettings,
+  metricRegistry: MetricRegistry,
+  injector: Injector
+)(implicit ec: ExecutionContext)
     extends Scheduler {
 
   /**
@@ -41,6 +53,7 @@ class QuartzScheduler @Inject() (settings: MoonlightSettings, injector: Injector
       dataMap.put(JOB_RUNNER_ARG, injector.instanceOf(in.jobInnerClassTag))
       dataMap.put(JOB_DATA_IN_ARG, in.in)
       dataMap.put(JOB_TIMEOUT, in.timeout)
+      dataMap.put(METRIC_REGISTRY, metricRegistry)
 
       // we use the same class for all jobs
       val job = newJob(classOf[QuartzScheduledJob])

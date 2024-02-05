@@ -26,6 +26,14 @@ object Metrics {
     def failed(jobType: String) = s"executor.$jobType.failed"
   }
 
+  object scheduled {
+    def duration(jobType: String) = s"scheduled.$jobType.duration"
+    def started(jobType: String) = s"scheduled.$jobType.started"
+    def succeeded(jobType: String) = s"scheduled.$jobType.succeeded"
+    def timeout(jobType: String) = s"scheduled.$jobType.timeout"
+    def failed(jobType: String) = s"scheduled.$jobType.failed"
+  }
+
   implicit class MetricRegistryOps(val registry: MetricRegistry) extends AnyVal {
     def settableGauge[T](name: String): SettableGauge[T] = {
       registry match {

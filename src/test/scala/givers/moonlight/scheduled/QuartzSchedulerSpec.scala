@@ -1,5 +1,6 @@
 package givers.moonlight.scheduled
 
+import com.codahale.metrics.MetricRegistry
 import givers.moonlight.scheduled.quartz.QuartzScheduler
 import givers.moonlight.scheduled.CronSchedule._
 import givers.moonlight.scheduled.quartz.macros.QuartzCronExpression._
@@ -57,7 +58,7 @@ class QuartzSchedulerSpec extends AsyncWordSpecLike with Matchers with AsyncIdio
         schedulerInputs = Set(in)
       )
 
-      val processor = new QuartzScheduler(settings, injector)
+      val processor = new QuartzScheduler(settings, new MetricRegistry, injector)
 
       stopFn.set(Some(processor.run()))
 
