@@ -9,7 +9,7 @@ import scala.util.Random
 
 class MoonlightSettingsSpec extends AnyWordSpecLike with Matchers with IdiomaticMockito {
   private val settings =
-    MoonlightSettings(1, 3.seconds, 0.seconds, 5.seconds, 0.seconds, 1, 0.seconds, 90.days, Seq.empty, Set.empty)
+    MoonlightSettings(1, 3.seconds, 0.seconds, 5.seconds, 0.seconds, 1, 0.seconds, 90.days, Seq.empty, Seq.empty)
 
   "MoonlightSettings.pauseDurationWhenNoJobsRandomized" should {
     "return random pause" in {

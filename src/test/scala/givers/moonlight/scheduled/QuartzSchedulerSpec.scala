@@ -55,7 +55,7 @@ class QuartzSchedulerSpec extends AsyncWordSpecLike with Matchers with AsyncIdio
         jobRunTimeout = 1.second,
         completedJobsTtl = 90.days,
         executors = Seq.empty,
-        schedulerInputs = Set(in)
+        schedulerInputs = Seq(in)
       )
 
       val processor = new QuartzScheduler(settings, new MetricRegistry, injector)

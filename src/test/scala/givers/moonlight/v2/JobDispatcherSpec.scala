@@ -96,7 +96,7 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
         jobRunTimeout = 1.second,
         completedJobsTtl = 90.days,
         executors = Seq(new Executor1, new Executor1),
-        schedulerInputs = Set.empty
+        schedulerInputs = Seq.empty
       )
 
       an[JobTypeExecutorAlreadyExists] should be thrownBy new JobDispatcher(
@@ -132,7 +132,7 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
         jobRunTimeout = 1.second,
         completedJobsTtl = 90.days,
         executors = Seq(new Executor1),
-        schedulerInputs = Set.empty
+        schedulerInputs = Seq.empty
       )
 
       val schedulerCancel = mock[Cancellable]
