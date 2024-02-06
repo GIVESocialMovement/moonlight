@@ -14,10 +14,12 @@ import org.quartz.CronScheduleBuilder.cronSchedule
 import org.quartz.JobBuilder.newJob
 import org.quartz.TriggerBuilder.newTrigger
 import org.quartz.{CronExpression, JobDataMap, Trigger}
+import play.api.Logger
 import play.api.inject.Injector
 
 import javax.inject.Inject
 import scala.concurrent.{ExecutionContext, Future}
+import scala.util.{Failure, Success, Try}
 
 /**
  * Quartz scheduler
@@ -36,6 +38,8 @@ class QuartzScheduler @Inject() (
 )(implicit ec: ExecutionContext)
     extends Scheduler {
 
+  private[this] val logger = Logger(this.getClass)
+
   /**
    * @inheritdoc
    */
@@ -47,21 +51,25 @@ class QuartzScheduler @Inject() (
 
     settings.schedulerInputs.zipWithIndex.foreach { case (in, index) =>
       val jobInnerClass = in.jobInnerClassTag
-      val trigger = scheduleToTrigger(in.schedule, s"schedule_${jobInnerClass.getName}_${index}_${startTime}")
+      val trigger = scheduleToTrigger(in.schedule, s"schedule_${jobInnerClass.getName}_${index}_$startTime")
 
       val dataMap = new JobDataMap
-      dataMap.put(JOB_RUNNER_ARG, injector.instanceOf(in.jobInnerClassTag))
+      dataMap.put(JOB_RUNNER_ARG, injector.instanceOf(jobInnerClass))
       dataMap.put(JOB_DATA_IN_ARG, in.in)
       dataMap.put(JOB_TIMEOUT, in.timeout)
       dataMap.put(METRIC_REGISTRY, metricRegistry)
 
       // we use the same class for all jobs
       val job = newJob(classOf[QuartzScheduledJob])
-        .withIdentity(s"${jobInnerClass.getName}_${index}_${startTime}")
+        .withIdentity(s"${jobInnerClass.getName}_${index}_$startTime")
         .setJobData(dataMap)
         .build()
 
-      quartz.scheduleJob(job, trigger)
+      Try(quartz.scheduleJob(job, trigger)) match {
+        case Success(nextFireDate) =>
+          logger.info(s"Job#$index with class $jobInnerClass was successfully scheduled. Next fire time $nextFireDate")
+        case Failure(ex) => logger.error(s"Unable to schedule job#$index with class $jobInnerClass", ex)
+      }
     }
 
     quartz.start()

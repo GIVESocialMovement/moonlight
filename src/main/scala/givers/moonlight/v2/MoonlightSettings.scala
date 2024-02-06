@@ -40,7 +40,7 @@ case class MoonlightSettings(
   jobRunTimeout: FiniteDuration,
   completedJobsTtl: FiniteDuration,
   executors: Seq[JobExecutor[_]],
-  schedulerInputs: Set[SchedulerInput[_]]
+  schedulerInputs: Seq[SchedulerInput[_]]
 ) {
 
   /**

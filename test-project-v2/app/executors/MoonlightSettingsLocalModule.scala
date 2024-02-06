@@ -41,7 +41,7 @@ class MoonlightSettingsLocalProvider @Inject() (simpleExecutor: SimpleExecutor) 
           jobRunTimeout = 10.seconds,
           completedJobsTtl = (24 * 30).hours,
           executors = Seq(simpleExecutor),
-          schedulerInputs = Set(
+          schedulerInputs = Seq(
             // each minute
             SchedulerInput[SimpleScheduledJob]((atomic, "job1"), cronExpression("0 * * * * ? *"), 10.seconds),
             // each 3 minutes
