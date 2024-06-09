@@ -7,7 +7,7 @@ Global / organization := "io.github.givesocialmovement"
 
 name := "play-moonlight"
 
-version := "1.1.2"
+version := "1.1.3"
 
 lazy val macros = (project in file("macros"))
   .settings(
