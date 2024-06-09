@@ -85,6 +85,6 @@ object QuartzScheduledJob {
   private val jobNameRegex = "[^A-Za-z0-9]+"
   private val jobNameReplace = "_"
   def formatJobType(job: ScheduledJob) = {
-    job.getClass.getName.replaceAll(jobNameRegex, jobNameReplace)
+    job.getClass.getSimpleName.replaceAll(jobNameRegex, jobNameReplace)
   }
 }
