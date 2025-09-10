@@ -15,7 +15,7 @@ trait JobInSerDe[IN] {
 }
 
 object JobInSerDe {
-  def json[IN](implicit format: OFormat[IN]): JobInSerDe[IN] = new JobInSerDe[IN] {
+  def json[IN](using format: OFormat[IN]): JobInSerDe[IN] = new JobInSerDe[IN] {
     override def serialize(in: IN): String = format.writes(in).toString()
 
     override def deserialize(inSerialized: String): Try[IN] = JsResult.toTry(format.reads(Json.parse(inSerialized)))

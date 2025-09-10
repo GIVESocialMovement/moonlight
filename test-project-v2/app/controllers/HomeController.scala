@@ -12,10 +12,11 @@ import javax.inject.{Inject, Singleton}
 import scala.concurrent.ExecutionContext
 
 @Singleton
-class HomeController @Inject()(
-                                repo: BackgroundJobRepository,
-                                controllerComponents: ControllerComponents
-)(implicit ec: ExecutionContext) extends AbstractController(controllerComponents)  {
+class HomeController @Inject() (
+  repo: BackgroundJobRepository,
+  controllerComponents: ControllerComponents
+)(implicit ec: ExecutionContext)
+    extends AbstractController(controllerComponents) {
 
   def index: Action[AnyContent] = Action.async {
     repo.getJobs(0, 10).map { jobs =>
@@ -24,6 +25,8 @@ class HomeController @Inject()(
   }
 
   case class AddParam(data: String, priority: Int)
+  object AddParam :
+    def unapply(arg: AddParam): Option[(String, Int)] = Some((arg.data, arg.priority))
 
   val addForm: Form[AddParam] = Form(
     mapping(
@@ -33,28 +36,32 @@ class HomeController @Inject()(
   )
 
   def add: Action[AnyContent] = Action.async { implicit req =>
-    addForm.bindFromRequest().fold(
-      hasErrors = { error =>
-        throw new Exception("Invalid form data: " + error)
-      },
-      success = { param =>
-        repo
-          .enqueue(BackgroundJob(
-            id = -1,
-            createdAt = new Date(),
-            shouldRunAt = new Date(System.currentTimeMillis() + 10000),
-            initiatedAtOpt = None,
-            startedAtOpt = None,
-            finishedAtOpt = None,
-            status = BackgroundJob.Status.Pending,
-            error = "",
-            tryCount = 0,
-            jobType = SimpleExecutor.Type.id,
-            paramsInJsonString = SimpleExecutor.Type.serDe.serialize(SimpleExecutor.Job(param.data)),
-            priority = param.priority
-          ))
-          .map { _ => Redirect("/") }
-      }
-    )
+    addForm
+      .bindFromRequest()
+      .fold(
+        hasErrors = { error =>
+          throw new Exception("Invalid form data: " + error)
+        },
+        success = { param =>
+          repo
+            .enqueue(
+              BackgroundJob(
+                id = -1,
+                createdAt = new Date(),
+                shouldRunAt = new Date(System.currentTimeMillis() + 10000),
+                initiatedAtOpt = None,
+                startedAtOpt = None,
+                finishedAtOpt = None,
+                status = BackgroundJob.Status.Pending,
+                error = "",
+                tryCount = 0,
+                jobType = SimpleExecutor.Type.id,
+                paramsInJsonString = SimpleExecutor.Type.serDe.serialize(SimpleExecutor.Job(param.data)),
+                priority = param.priority
+              )
+            )
+            .map { _ => Redirect("/") }
+        }
+      )
   }
 }

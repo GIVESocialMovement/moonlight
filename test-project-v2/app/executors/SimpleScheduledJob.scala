@@ -7,11 +7,12 @@ import play.api.Logger
 import java.util.concurrent.atomic.AtomicInteger
 import scala.concurrent.{ExecutionContext, Future}
 
-class SimpleScheduledJob @Inject() (implicit val executionContext: ExecutionContext) extends ScheduledJob {
-  type IN = (AtomicInteger, String)
+class SimpleScheduledJob @Inject() (implicit val executionContext: ExecutionContext)
+    extends ScheduledJob[(AtomicInteger, String)] {
 
   private val logger = Logger(this.getClass)
-  override def run(input: IN): Future[Unit] = {
+
+  override def run(input: (AtomicInteger, String)): Future[Unit] = {
     val (atomic, name) = input
 
     logger.info(s"[$name] current ${atomic.get()}")

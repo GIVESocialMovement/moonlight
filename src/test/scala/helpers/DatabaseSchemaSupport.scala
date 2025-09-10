@@ -12,13 +12,13 @@ import scala.util.Failure
  * Allow automatically create/drop schemas
  */
 trait DatabaseSchemaSupport extends BeforeAndAfter {
-  self: DatabaseSpec with Suite =>
+  self: DatabaseSpec & Suite =>
 
   private val logger = Logger(this.getClass)
 
   protected val DB_OPERATION_TIMEOUT: Duration = 5.seconds
 
-  import profile.api._
+  import profile.api.*
 
   protected def schemas: profile.SchemaDescription
 
@@ -44,4 +44,3 @@ trait DatabaseSchemaSupport extends BeforeAndAfter {
     Await.result(f, DB_OPERATION_TIMEOUT)
   }
 }
-

@@ -1,7 +1,7 @@
 name := """test-project-v2"""
 organization := "givers.moonlight"
 
-version := "2.0-SNAPSHOT"
+version := "3.0-SNAPSHOT"
 
 lazy val moonlight = RootProject(file(".."))
 lazy val root = (project in file("."))
@@ -9,7 +9,7 @@ lazy val root = (project in file("."))
   .aggregate(moonlight)
   .dependsOn(moonlight)
 
-scalaVersion := "2.13.8"
+scalaVersion := "3.7.2"
 
 run / fork := true
 
@@ -17,7 +17,7 @@ libraryDependencies ++= Seq(
   ws,
   guice,
   "com.google.inject" % "guice" % "5.1.0",
-  "com.typesafe.play" %% "play-slick" % "5.0.0",
-  "com.typesafe.play" %% "play-slick-evolutions" % "5.0.0",
-  "org.postgresql" % "postgresql" % "42.2.14"
+  "org.playframework" %% "play-slick" % "6.2.0",
+  "org.playframework" %% "play-slick-evolutions" % "6.2.0",
+  "org.postgresql" % "postgresql" % "42.7.7"
 )

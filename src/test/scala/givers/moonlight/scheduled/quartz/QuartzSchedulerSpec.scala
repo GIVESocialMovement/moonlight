@@ -1,11 +1,12 @@
-package givers.moonlight.scheduled
+package givers.moonlight.scheduled.quartz
 
 import com.codahale.metrics.MetricRegistry
+import givers.moonlight.scheduled.CronSchedule.{*, given}
 import givers.moonlight.scheduled.quartz.QuartzScheduler
-import givers.moonlight.scheduled.CronSchedule._
-import givers.moonlight.scheduled.quartz.macros.QuartzCronExpression._
+import givers.moonlight.scheduled.quartz.QuartzCronExpression.*
+import givers.moonlight.scheduled.{ScheduledJob, Scheduler, SchedulerInput}
+import givers.moonlight.util.AsyncIdiomaticMockito
 import givers.moonlight.v2.MoonlightSettings
-import org.mockito.scalatest.AsyncIdiomaticMockito
 import org.scalatest.BeforeAndAfter
 import org.scalatest.concurrent.Eventually.eventually
 import org.scalatest.matchers.should.Matchers
@@ -13,8 +14,8 @@ import org.scalatest.wordspec.AsyncWordSpecLike
 import play.api.inject.Injector
 
 import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
-import scala.concurrent.{ExecutionContext, Future}
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.{ExecutionContext, Future}
 
 class QuartzSchedulerSpec extends AsyncWordSpecLike with Matchers with AsyncIdiomaticMockito with BeforeAndAfter {
 
@@ -28,8 +29,7 @@ class QuartzSchedulerSpec extends AsyncWordSpecLike with Matchers with AsyncIdio
     stopFn.get().foreach(stop => stop())
   }
 
-  class SimpleScript()(implicit val executionContext: ExecutionContext) extends ScheduledJob {
-    type IN = AtomicInteger
+  class SimpleScript()(implicit val executionContext: ExecutionContext) extends ScheduledJob[AtomicInteger] {
     override def run(input: AtomicInteger): Future[Unit] = {
       input.incrementAndGet()
       Future.unit
@@ -41,7 +41,7 @@ class QuartzSchedulerSpec extends AsyncWordSpecLike with Matchers with AsyncIdio
       val ref = new AtomicInteger(0)
 
       val injector: Injector = mock[Injector]
-      val in = SchedulerInput[SimpleScript](ref, cronExpression("* * * * * ? *"), 1.minute)
+      val in = SchedulerInput(ref, cronExpression("* * * * * ? *"), 1.minute).forJob[SimpleScript]
 
       injector.instanceOf(classOf[SimpleScript]) returns new SimpleScript
 

@@ -3,4 +3,4 @@ package givers.moonlight.persistence.table.postgres
 import givers.moonlight.persistence.PostgresSlickJdbcProfile
 import givers.moonlight.persistence.table.BackgroundJobTableComponent
 
-class PgBackgroundJobTableComponent extends BackgroundJobTableComponent with PostgresSlickJdbcProfile
+class PgBackgroundJobTableComponent extends PostgresSlickJdbcProfile, BackgroundJobTableComponent 

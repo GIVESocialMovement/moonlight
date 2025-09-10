@@ -1,14 +1,13 @@
 package givers.moonlight.v2
 
-import akka.actor.Cancellable
-import akka.actor.typed.Scheduler
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.typed.Scheduler
 import com.codahale.metrics.MetricRegistry
-import givers.moonlight.util.DateTimeFactory
-import givers.moonlight.util.RichDate.RichDate
+import givers.moonlight.util.{AsyncIdiomaticMockito, DateTimeFactory}
+import givers.moonlight.util.RichDate.*
 import givers.moonlight.v2.repository.BackgroundJobRepository
-import givers.moonlight.{JobExecutor, JobInSerDe, JobType, JobTypeJson}
+import givers.moonlight.{JobExecutor, JobTypeJson}
 import helpers.BackgroundJobFixture
-import org.mockito.scalatest.AsyncIdiomaticMockito
 import org.scalatest.Succeeded
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpecLike
@@ -17,7 +16,6 @@ import play.api.libs.json.Json
 
 import java.time.{Duration, LocalTime, ZoneId, ZonedDateTime}
 import java.util.Date
-import scala.annotation.nowarn
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration.{DurationInt, FiniteDuration}
 import scala.util.Random
@@ -28,7 +26,7 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
   object Executor1 {
     case class JobData(shouldSucceed: Boolean)
 
-    case object Type extends JobTypeJson[Executor1.JobData]("Executor1")(Json.format)
+    case object Type extends JobTypeJson[Executor1.JobData]("Executor1")(using Json.format)
   }
 
   class Executor1 extends JobExecutor(Executor1.Type) {
@@ -179,8 +177,8 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
           )
         )
         // there is no worker for this job so it will just log error
-        .andThen(Future.successful(Some(jobOfType("Executor2", secondId))))
-        .andThenAnswer {
+        .thenReturn(Future.successful(Some(jobOfType("Executor2", secondId))))
+        .thenAnswer {
           Future.successful(None)
         }
 
@@ -197,7 +195,7 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
           )
         )
         // this job will be skipped because of concurrency simulation
-        .andThen(
+        .thenReturn(
           Future.successful(
             Some(
               jobOfType("Executor1", fourthId)
@@ -206,7 +204,7 @@ class JobDispatcherSpec extends AsyncWordSpecLike with Matchers with AsyncIdioma
           )
         )
         // no more jobs
-        .andThenAnswer {
+        .thenAnswer {
           if (!allJobsWereUsed.isCompleted) {
             allJobsWereUsed.success(())
           }

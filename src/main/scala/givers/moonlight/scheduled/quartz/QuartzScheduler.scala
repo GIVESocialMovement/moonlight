@@ -38,7 +38,7 @@ class QuartzScheduler @Inject() (
 )(implicit ec: ExecutionContext)
     extends Scheduler {
 
-  private[this] val logger = Logger(this.getClass)
+  private val logger = Logger(this.getClass)
 
   /**
    * @inheritdoc

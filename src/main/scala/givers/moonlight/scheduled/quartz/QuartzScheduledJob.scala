@@ -19,7 +19,7 @@ import scala.util.{Failure, Success, Try}
  */
 class QuartzScheduledJob extends Job {
 
-  private[this] val logger = Logger(this.getClass)
+  private val logger = Logger(this.getClass)
   override def execute(context: JobExecutionContext): Unit = {
     val runId = UUID.randomUUID()
     val start = System.currentTimeMillis()
@@ -27,8 +27,8 @@ class QuartzScheduledJob extends Job {
     def took: Double = (System.currentTimeMillis() - start).toDouble / 1000
 
     // get data populated by scheduler
-    val job = context.getMergedJobDataMap.get(JOB_RUNNER_ARG).asInstanceOf[ScheduledJob]
-    val data = context.getMergedJobDataMap.get(JOB_DATA_IN_ARG).asInstanceOf[job.IN]
+    val job = context.getMergedJobDataMap.get(JOB_RUNNER_ARG).asInstanceOf[ScheduledJob[?]]
+    val data = context.getMergedJobDataMap.get(JOB_DATA_IN_ARG).asInstanceOf[job.INPUT]
     val timeout = context.getMergedJobDataMap.get(JOB_TIMEOUT).asInstanceOf[Duration]
     val metricRegistry = context.getMergedJobDataMap.get(METRIC_REGISTRY).asInstanceOf[MetricRegistry]
 
@@ -55,7 +55,7 @@ class QuartzScheduledJob extends Job {
           logger.error(s"Scheduled job failed after timeout (Run id: $runId, took: $took seconds)", ex)
         case _ =>
       }
-    }(job.executionContext)
+    }(using job.executionContext)
 
     // Await needed since quartz jobs are supposed to be synchronous
     Try(Await.result(jobRun, timeout)) match {
@@ -84,7 +84,8 @@ object QuartzScheduledJob {
 
   private val jobNameRegex = "[^A-Za-z0-9]+"
   private val jobNameReplace = "_"
-  def formatJobType(job: ScheduledJob) = {
+  
+  def formatJobType(job: ScheduledJob[?]): String = {
     job.getClass.getSimpleName.replaceAll(jobNameRegex, jobNameReplace)
   }
 }

@@ -15,6 +15,19 @@ import scala.reflect.ClassTag
  * @tparam SJ
  *   Scheduled job class
  */
-case class SchedulerInput[SJ <: ScheduledJob: ClassTag](in: SJ#IN, schedule: Schedule, timeout: FiniteDuration) {
-  def jobInnerClassTag: Class[SJ] = implicitly[ClassTag[SJ]].runtimeClass.asInstanceOf[Class[SJ]]
+case class SchedulerInput[IN, SJ <: ScheduledJob[IN]](
+  in: IN,
+  schedule: Schedule,
+  timeout: FiniteDuration
+)(using c: ClassTag[SJ]) {
+  def jobInnerClassTag: Class[SJ] = summon[ClassTag[SJ]].runtimeClass.asInstanceOf[Class[SJ]]
+}
+
+object SchedulerInput {
+  case class SchedulerInputUnattached[IN](in: IN, schedule: Schedule, timeout: FiniteDuration):
+    def forJob[SJ <: ScheduledJob[IN]](using c: ClassTag[SJ]): SchedulerInput[IN, SJ] =
+      SchedulerInput(in, schedule, timeout)
+
+  def apply[IN](in: IN, schedule: Schedule, timeout: FiniteDuration): SchedulerInputUnattached[IN] =
+    SchedulerInputUnattached[IN](in, schedule, timeout)
 }

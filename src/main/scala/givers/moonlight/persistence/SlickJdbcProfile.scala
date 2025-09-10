@@ -5,6 +5,4 @@ import slick.jdbc.JdbcProfile
 /**
  * Keeps Jdbc profile implementation
  */
-trait SlickJdbcProfile {
-  protected val profile: JdbcProfile
-}
+trait SlickJdbcProfile(val profile: JdbcProfile)

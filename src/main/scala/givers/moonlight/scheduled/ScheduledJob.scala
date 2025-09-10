@@ -5,9 +5,9 @@ import scala.concurrent.{ExecutionContext, Future}
 /**
  * The same as background job but should run periodically on the some schedule A.k.a "Script"
  */
-trait ScheduledJob {
+trait ScheduledJob[IN]:
   // job input
-  type IN
+  type INPUT = IN
 
   // job execution context
   def executionContext: ExecutionContext
@@ -18,5 +18,4 @@ trait ScheduledJob {
    *   job input
    * @return
    */
-  def run(input: IN): Future[Unit]
-}
+  def run(input: INPUT): Future[Unit]
