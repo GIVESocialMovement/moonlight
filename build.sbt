@@ -32,10 +32,6 @@ libraryDependencies ++= Seq(
 
 Test / parallelExecution := false
 
-bintrayOrganization := Some("givers")
-
-bintrayRepository := "maven"
-
 ThisBuild / sonatypeCredentialHost := "s01.oss.sonatype.org"
 
 pomIncludeRepository := { _ => false }
