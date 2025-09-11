@@ -3,7 +3,7 @@ jobs:
   build:
     docker:
       - image: cimg/openjdk:17.0.7
-      - image: cimg/postgres:17.5.0
+      - image: cimg/postgres:17.5
         environment:
           POSTGRES_USER: moonlight_test_user
           POSTGRES_DB: moonlight_test
