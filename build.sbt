@@ -8,6 +8,7 @@ Global / organization := "io.github.givesocialmovement"
 name := "play-moonlight"
 
 version := "2.0.0"
+versionScheme := Some("semver-spec")
 
 lazy val moonlight = project in file(".")
 
