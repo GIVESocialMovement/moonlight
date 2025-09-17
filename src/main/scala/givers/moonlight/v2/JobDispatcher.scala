@@ -1,14 +1,14 @@
 package givers.moonlight.v2
 
-import akka.actor.Cancellable
-import akka.actor.typed.Scheduler
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.typed.Scheduler
 import com.codahale.metrics.MetricRegistry
 import com.google.inject.Singleton
-import givers.moonlight.util.Metrics.MetricRegistryOps
+import givers.moonlight.util.Metrics.*
 import givers.moonlight.{BackgroundJob, JobExecutor}
 import givers.moonlight.util.{DateTimeFactory, Metrics}
-import givers.moonlight.util.RichDate._
-import givers.moonlight.util.RichFuture.TimeoutAwareFuture
+import givers.moonlight.util.RichDate.*
+import givers.moonlight.util.RichFuture.*
 import givers.moonlight.v2.repository.BackgroundJobRepository
 import play.api.Logger
 import play.api.inject.Injector
@@ -53,7 +53,7 @@ class JobDispatcher @Inject() (
   dateTimeFactory: DateTimeFactory,
   metricRegistry: MetricRegistry
 )(implicit executionContext: ExecutionContext, injector: Injector, scheduler: Scheduler, random: Random) {
-  private[this] val logger = Logger(this.getClass)
+  private val logger = Logger(this.getClass)
 
   private val activeExecutorsCount = metricRegistry.settableGauge[Int](Metrics.jobDispatcher.activeExecutorsCount)
   private val readyToStartCount = metricRegistry.settableGauge[Int](Metrics.jobDispatcher.jobsReadyToStart)
@@ -67,8 +67,8 @@ class JobDispatcher @Inject() (
 
   private val concurrentFailCount = metricRegistry.counter(Metrics.jobDispatcher.concurrentFail)
 
-  val typeExecutors: Map[String, JobExecutor[_]] = {
-    settings.executors.foldLeft(Map.empty[String, JobExecutor[_]]) { case (current, executor) =>
+  val typeExecutors: Map[String, JobExecutor[?]] = {
+    settings.executors.foldLeft(Map.empty[String, JobExecutor[?]]) { case (current, executor) =>
       current.updatedWith(executor.jobType.id) {
         case Some(_) => throw JobTypeExecutorAlreadyExists(executor.jobType.id)
         case _ => Some(executor)

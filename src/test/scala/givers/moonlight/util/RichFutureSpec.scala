@@ -9,7 +9,7 @@ import scala.concurrent.duration.DurationInt
 import scala.concurrent.{Future, Promise}
 
 class RichFutureSpec extends AsyncWordSpecLike with Matchers with BeforeAndAfterAll {
-  import RichFuture._
+  import RichFuture.*
 
   private val scheduler: ScheduledExecutorService = Executors.newScheduledThreadPool(0)
 
@@ -19,7 +19,7 @@ class RichFutureSpec extends AsyncWordSpecLike with Matchers with BeforeAndAfter
         val promise = Promise[Boolean]()
         scheduler.schedule(() => promise.success(true), 4, TimeUnit.SECONDS)
 
-        val future = RichFuture.withTimeout(promise.future, 1.second)
+        val future = promise.future.withTimeout(1.second)
 
         recoverToSucceededIf[TimeoutException](future)
       }
@@ -27,7 +27,7 @@ class RichFutureSpec extends AsyncWordSpecLike with Matchers with BeforeAndAfter
 
     "succeed future" when {
       "timeout was not reached" in {
-        RichFuture.withTimeout(Future(true), 1.second).map {
+        Future(true).withTimeout(1.second).map {
           _ shouldBe true
         }
       }

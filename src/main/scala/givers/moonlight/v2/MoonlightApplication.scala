@@ -1,7 +1,7 @@
 package givers.moonlight.v2
 
-import akka.Done
-import akka.actor.CoordinatedShutdown
+import org.apache.pekko.Done
+import org.apache.pekko.actor.CoordinatedShutdown
 import givers.moonlight.scheduled.quartz.QuartzScheduler
 import play.api._
 import play.api.inject.guice.GuiceApplicationBuilder

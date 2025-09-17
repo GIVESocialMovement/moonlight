@@ -4,7 +4,7 @@ import com.google.inject.Inject
 import givers.moonlight.BackgroundJob
 import givers.moonlight.BackgroundJob._
 import givers.moonlight.persistence.table.BackgroundJobTableComponent
-import givers.moonlight.util.RichDate.RichDate
+import givers.moonlight.util.RichDate.*
 import play.api.db.slick.{DatabaseConfigProvider, HasDatabaseConfigProvider}
 import slick.jdbc.JdbcProfile
 
@@ -99,7 +99,7 @@ class BackgroundJobJdbcRepository @Inject() (
   private def pendingJobsConditions(
     job: BackgroundJobTable,
     now: Rep[Date]
-  ): Rep[Option[Boolean]] = {
+  ): Rep[Boolean] = {
     job.status === Status.Pending && job.shouldRunAt <= now
   }
 

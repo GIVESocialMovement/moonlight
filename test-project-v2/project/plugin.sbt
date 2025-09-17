@@ -1,5 +1,5 @@
 resolvers += Classpaths.sbtPluginReleases
 
-addSbtPlugin("com.typesafe.play" % "sbt-plugin" % "2.8.15")
-addSbtPlugin("com.typesafe.sbt" % "sbt-native-packager" % "1.3.6")
-addSbtPlugin("com.typesafe.sbt" % "sbt-twirl" % "1.5.1")
+addSbtPlugin("org.playframework" % "sbt-plugin" % "3.0.8")
+addSbtPlugin("com.github.sbt" % "sbt-native-packager" % "1.11.3")
+addSbtPlugin("com.typesafe.play" % "sbt-twirl" % "1.6.10")

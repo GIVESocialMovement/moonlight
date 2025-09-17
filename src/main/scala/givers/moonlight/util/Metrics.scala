@@ -34,7 +34,7 @@ object Metrics {
     def failed(jobType: String) = s"scheduled.$jobType.failed"
   }
 
-  implicit class MetricRegistryOps(val registry: MetricRegistry) extends AnyVal {
+  extension (registry: MetricRegistry) {
     def settableGauge[T](name: String): SettableGauge[T] = {
       registry match {
         case _: NoopMetricRegistry => new DefaultSettableGauge[T]

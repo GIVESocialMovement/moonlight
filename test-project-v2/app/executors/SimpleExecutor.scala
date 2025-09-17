@@ -1,18 +1,18 @@
 package executors
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import com.google.inject.{Inject, Singleton}
 import givers.moonlight.{JobExecutor, JobTypeJson}
 import play.api.libs.json.Json
 
 import scala.concurrent.{ExecutionContext, Future}
+import java.util.concurrent.Executors
 
 @Singleton
 class SimpleExecutor @Inject()(implicit ec: ExecutionContext, actorSystem: ActorSystem)
     extends JobExecutor(SimpleExecutor.Type) {
 
-  private val blocking = actorSystem.dispatchers.lookup("akka.actor.blocking-dispatcher")
-
+  private val blocking = actorSystem.dispatchers.lookup("pekko.actor.blocking-dispatcher")
   override def run(data: SimpleExecutor.Job): Future[Unit] = {
 
     val start = System.currentTimeMillis()
@@ -25,7 +25,7 @@ class SimpleExecutor @Inject()(implicit ec: ExecutionContext, actorSystem: Actor
           s"processing blocking $str " + Thread.currentThread().getName + " " + (System.currentTimeMillis() - start)
         )
         Thread.sleep(3000)
-      }(blocking)
+      }(using blocking)
         .map { _ =>
           println(s"finish waiting $str " + Thread.currentThread().getName + " " + (System.currentTimeMillis() - start))
         }
@@ -44,5 +44,5 @@ class SimpleExecutor @Inject()(implicit ec: ExecutionContext, actorSystem: Actor
 object SimpleExecutor {
   case class Job(data: String)
 
-  implicit case object Type extends JobTypeJson[Job]("Simple")(Json.format)
+  implicit case object Type extends JobTypeJson[Job]("Simple")(using Json.format)
 }

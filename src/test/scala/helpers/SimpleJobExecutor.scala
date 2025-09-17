@@ -22,5 +22,5 @@ class SimpleJobExecutor @Inject() (implicit executionContext: ExecutionContext)
 object SimpleJobExecutor {
   case class JobData(data: String)
 
-  case object Type extends JobTypeJson[SimpleJobExecutor.JobData]("Simple")(Json.format)
+  case object Type extends JobTypeJson[SimpleJobExecutor.JobData]("Simple")(using Json.format)
 }

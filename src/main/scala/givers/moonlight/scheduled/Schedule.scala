@@ -1,6 +1,6 @@
 package givers.moonlight.scheduled
 
-import givers.moonlight.scheduled.quartz.macros.ValidCronExpression
+import givers.moonlight.scheduled.quartz.ValidCronExpression
 
 /**
  * Abstract schedule
@@ -16,6 +16,6 @@ sealed trait Schedule
 case class CronSchedule(cronString: String) extends Schedule
 
 object CronSchedule {
-  implicit def fromValidCronExpression(vce: ValidCronExpression): CronSchedule = CronSchedule(vce.stringExpression)
-
+  given fromValidCronExpression: Conversion[ValidCronExpression, CronSchedule] with
+    def apply(vce: ValidCronExpression): CronSchedule = CronSchedule(vce.stringExpression)
 }

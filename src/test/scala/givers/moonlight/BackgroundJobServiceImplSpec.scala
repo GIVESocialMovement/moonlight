@@ -1,9 +1,8 @@
 package givers.moonlight
 
-import givers.moonlight.util.DateTimeFactory
+import givers.moonlight.util.{AsyncIdiomaticMockito, DateTimeFactory}
 import givers.moonlight.v2.repository.BackgroundJobRepository
 import helpers.SimpleJobExecutor
-import org.mockito.scalatest.AsyncIdiomaticMockito
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpecLike
 

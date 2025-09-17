@@ -13,10 +13,12 @@ trait BackgroundJobTableComponent extends SlickJdbcProfile {
   import profile.api._
 
   def statusToSqlType(status: Status.Value): String = status.toString
-  implicit val StatusColumnType: BaseColumnType[Status.Value] = MappedColumnType.base[Status.Value, String](statusToSqlType, Status.withName)
+  implicit val StatusColumnType: BaseColumnType[Status.Value] =
+    MappedColumnType.base[Status.Value, String](statusToSqlType, Status.withName)
 
   def dateToSqlType(date: Date): Long = date.getTime
-  implicit val DateColumnType: BaseColumnType[Date] = MappedColumnType.base[Date, Long](dateToSqlType, { t => new Date(t) })
+  implicit val DateColumnType: BaseColumnType[Date] =
+    MappedColumnType.base[Date, Long](dateToSqlType, { t => new Date(t) })
 
   class BackgroundJobTable(tag: Tag) extends Table[BackgroundJob](tag, "background_jobs") {
 
@@ -48,7 +50,7 @@ trait BackgroundJobTableComponent extends SlickJdbcProfile {
       jobType,
       paramsInJsonString,
       priority
-    ) <> ((BackgroundJob.apply _).tupled, BackgroundJob.unapply)
+    ) <> (BackgroundJob.apply.tupled, BackgroundJob.unapply)
   }
 
   val backgroundJobs = TableQuery[BackgroundJobTable]

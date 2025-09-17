@@ -10,11 +10,8 @@ object RichDate {
 
   /**
    * Pimp my Library pattern for Date
-   *
-   * @param date
-   *   date instance
    */
-  implicit class RichDate(val date: Date) extends AnyVal {
+  extension(date: Date) {
     def add(interval: FiniteDuration): Date = new Date(date.getTime + interval.toMillis)
 
     def sub(interval: FiniteDuration): Date = new Date((date.getTime - interval.toMillis).max(0))

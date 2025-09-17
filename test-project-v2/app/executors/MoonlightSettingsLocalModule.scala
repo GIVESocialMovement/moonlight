@@ -3,8 +3,8 @@ package executors
 import com.codahale.metrics.{MetricRegistry, NoopMetricRegistry}
 import com.google.inject.{Inject, Provider}
 import givers.moonlight.scheduled.SchedulerInput
-import givers.moonlight.scheduled.CronSchedule._
-import givers.moonlight.scheduled.quartz.macros.QuartzCronExpression.cronExpression
+import givers.moonlight.scheduled.CronSchedule.fromValidCronExpression
+import givers.moonlight.scheduled.quartz.QuartzCronExpression.cronExpression
 import givers.moonlight.v2.MoonlightSettings
 import play.api.inject.Binding
 import play.api.{Configuration, Environment}
@@ -13,7 +13,7 @@ import java.util.concurrent.atomic.{AtomicInteger, AtomicReference}
 import scala.concurrent.duration._
 
 class MoonlightSettingsLocalModule extends play.api.inject.Module {
-  def bindings(environment: Environment, configuration: Configuration): Seq[Binding[_]] = {
+  def bindings(environment: Environment, configuration: Configuration): Seq[Binding[?]] = {
     Seq(
       bind[MetricRegistry].toInstance(new NoopMetricRegistry),
       bind[MoonlightSettings].toProvider[MoonlightSettingsLocalProvider]
@@ -43,9 +43,9 @@ class MoonlightSettingsLocalProvider @Inject() (simpleExecutor: SimpleExecutor) 
           executors = Seq(simpleExecutor),
           schedulerInputs = Seq(
             // each minute
-            SchedulerInput[SimpleScheduledJob]((atomic, "job1"), cronExpression("0 * * * * ? *"), 10.seconds),
+            SchedulerInput((atomic, "job1"), cronExpression("0 * * * * ? *"), 10.seconds).forJob[SimpleScheduledJob],
             // each 3 minutes
-            SchedulerInput[SimpleScheduledJob]((atomic, "job2"), cronExpression("0 */3 * * * ? *"), 10.seconds)
+            SchedulerInput((atomic, "job2"), cronExpression("0 */3 * * * ? *"), 10.seconds).forJob[SimpleScheduledJob]
           )
         )
       )

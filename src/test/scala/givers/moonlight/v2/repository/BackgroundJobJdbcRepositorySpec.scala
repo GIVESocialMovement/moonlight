@@ -3,11 +3,11 @@ package givers.moonlight.v2.repository
 import givers.moonlight.BackgroundJob
 import givers.moonlight.BackgroundJob.Status
 import givers.moonlight.persistence.table.BackgroundJobTableComponent
-import givers.moonlight.util.RichDate.RichDate
+import givers.moonlight.util.RichDate.*
 import helpers.{DatabaseSchemaSupport, DatabaseSpec, H2SlickJdbcProfile}
-import org.mockito.scalatest.AsyncIdiomaticMockito
 import org.scalatest.matchers.should.Matchers
 import org.scalatest.wordspec.AsyncWordSpecLike
+import org.scalatestplus.mockito.MockitoSugar
 
 import java.util.Date
 import scala.concurrent.Future
@@ -17,13 +17,11 @@ class BackgroundJobJdbcRepositorySpec
     extends AsyncWordSpecLike
     with Matchers
     with DatabaseSpec
-    with DatabaseSchemaSupport
-    with AsyncIdiomaticMockito {
-
-  import profile.api._
+    with DatabaseSchemaSupport {
 
   val tables = new H2SlickJdbcProfile with BackgroundJobTableComponent
 
+  import profile.api.*
   override protected def schemas: profile.SchemaDescription = tables.backgroundJobs.schema
 
   private val repo = new BackgroundJobJdbcRepository(
