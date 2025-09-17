@@ -1,9 +1,12 @@
 import sbt.Keys.name
 import sbt.Test
+import xerial.sbt.Sonatype.sonatypeCentralHost
 
 Global / scalaVersion := "3.7.2"
 
 Global / organization := "io.github.givesocialmovement"
+Global / organizationName := "give.asia"
+Global / organizationHomepage := Some(url("https://give.asia"))
 
 name := "play-moonlight"
 
@@ -32,8 +35,6 @@ libraryDependencies ++= Seq(
 
 Test / parallelExecution := false
 
-ThisBuild / sonatypeCredentialHost := "s01.oss.sonatype.org"
-
 pomIncludeRepository := { _ => false }
 
 Global / homepage := Some(url("https://github.com/GIVESocialMovement/moonlight"))
@@ -49,15 +50,27 @@ Global / developers := List(
   Developer(id = "tanin", name = "tanin", email = "developers@giveasia.org", url = url("https://github.com/tanin47"))
 )
 
+Global / description := "Background job scheduler"
 Global / licenses := Seq(("MIT", url("http://opensource.org/licenses/MIT")))
 
 testFrameworks += new TestFramework("utest.runner.Framework")
 
+/**
+ * see [[https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html]]
+ */
+
+// Remove all additional repository other than Maven Central from POM
+pomIncludeRepository := { _ => false }
 publishMavenStyle := true
 
 Test / publishArtifact := false
 
-publishTo := sonatypePublishToBundle.value
+sonatypeCredentialHost := sonatypeCentralHost
+publishTo := {
+  val centralSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
+  if (isSnapshot.value) Some("central-snapshots" at centralSnapshots)
+  else localStaging.value
+}
 
 coverageFailOnMinimum := false
 coverageMinimumStmtTotal := 70
