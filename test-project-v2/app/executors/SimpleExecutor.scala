@@ -1,6 +1,6 @@
 package executors
 
-import akka.actor.ActorSystem
+import org.apache.pekko.actor.ActorSystem
 import com.google.inject.{Inject, Singleton}
 import givers.moonlight.{JobExecutor, JobTypeJson}
 import play.api.libs.json.Json

@@ -1,17 +1,17 @@
 import sbt.Keys.name
 import sbt.Test
 
-Global / scalaVersion := "2.13.8"
+Global / scalaVersion := "2.13.18"
 
 Global / organization := "io.github.givesocialmovement"
 
 name := "play-moonlight"
 
-version := "1.1.3"
+version := "1.2.0"
 
 lazy val macros = (project in file("macros"))
   .settings(
-    version := "1.1.0",
+    version := "1.2.0",
     name := "play-moonlight-macros",
     libraryDependencies ++= Seq(
       "org.scala-lang" % "scala-reflect" % scalaVersion.value,
@@ -26,16 +26,16 @@ lazy val moonlight = (project in file("."))
   .dependsOn(macros)
 
 libraryDependencies ++= Seq(
-  "com.typesafe.play" %% "play-slick" % "5.0.0" withSources () withJavadoc (),
-  "com.typesafe.play" %% "play-guice" % "2.8.15" withSources () withJavadoc (),
-  "com.google.inject" % "guice" % "5.1.0",
-  "org.postgresql" % "postgresql" % "42.2.14" withSources () withJavadoc (),
-  "com.typesafe.play" %% "play-json" % "2.8.1",
+  "org.playframework" %% "play-slick" % "6.2.0",
+  "org.playframework" %% "play-slick-evolutions" % "6.2.0" withSources () withJavadoc (),
+  "org.playframework" %% "play-guice" % "3.0.10" withSources () withJavadoc (),
+  "com.google.inject" % "guice" % "6.0.0",
+  "org.postgresql" % "postgresql" % "42.7.7" withSources () withJavadoc (),
+  "org.playframework" %% "play-json" % "3.0.6",
   "io.netty" % "netty-common" % "4.1.76.Final",
   "com.fasterxml.jackson.module" %% "jackson-module-scala" % "2.13.4",
   "io.dropwizard" % "dropwizard-metrics-graphite" % "2.1.4",
   Dependencies.quartz,
-  "com.typesafe.play" %% "play-slick-evolutions" % "5.0.0" % Test,
   "org.mockito" % "mockito-core" % "2.18.3" % Test,
   "com.lihaoyi" %% "utest" % "0.7.10" % Test,
   "org.mockito" %% "mockito-scala-scalatest" % "1.17.5" % Test,

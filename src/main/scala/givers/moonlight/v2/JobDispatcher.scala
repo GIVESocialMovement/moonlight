@@ -1,7 +1,7 @@
 package givers.moonlight.v2
 
-import akka.actor.Cancellable
-import akka.actor.typed.Scheduler
+import org.apache.pekko.actor.Cancellable
+import org.apache.pekko.actor.typed.Scheduler
 import com.codahale.metrics.MetricRegistry
 import com.google.inject.Singleton
 import givers.moonlight.util.Metrics.MetricRegistryOps

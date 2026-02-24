@@ -99,7 +99,7 @@ class BackgroundJobJdbcRepository @Inject() (
   private def pendingJobsConditions(
     job: BackgroundJobTable,
     now: Rep[Date]
-  ): Rep[Option[Boolean]] = {
+  ): Rep[Boolean] = {
     job.status === Status.Pending && job.shouldRunAt <= now
   }
 
