@@ -1,13 +1,12 @@
-import sbt.Keys.name
+import sbt.Keys.{name, publishTo, version}
 import sbt.Test
+import xerial.sbt.Sonatype.sonatypeCentralHost
 
 Global / scalaVersion := "2.13.18"
 
 Global / organization := "io.github.givesocialmovement"
-
-name := "play-moonlight"
-
-version := "1.2.0"
+Global / organizationName := "give.asia"
+Global / organizationHomepage := Some(url("https://give.asia"))
 
 lazy val macros = (project in file("macros"))
   .settings(
@@ -18,11 +17,16 @@ lazy val macros = (project in file("macros"))
       Dependencies.quartz
     ),
     publishMavenStyle := true,
-    Test / publishArtifact := false,
-    publishTo := sonatypePublishToBundle.value
+    Test / publishArtifact := false
   )
 
 lazy val moonlight = (project in file("."))
+  .settings(
+    name := "play-moonlight",
+    version := "1.2.0",
+    pomIncludeRepository := { _ => false },
+    publishMavenStyle := true
+  )
   .dependsOn(macros)
 
 libraryDependencies ++= Seq(
@@ -46,14 +50,6 @@ libraryDependencies ++= Seq(
 
 Test / parallelExecution := false
 
-bintrayOrganization := Some("givers")
-
-bintrayRepository := "maven"
-
-ThisBuild / sonatypeCredentialHost := "s01.oss.sonatype.org"
-
-pomIncludeRepository := { _ => false }
-
 Global / homepage := Some(url("https://github.com/GIVESocialMovement/moonlight"))
 
 Global / scmInfo := Some(
@@ -67,15 +63,27 @@ Global / developers := List(
   Developer(id = "tanin", name = "tanin", email = "developers@giveasia.org", url = url("https://github.com/tanin47"))
 )
 
+Global / description := "Background job scheduler"
 Global / licenses := Seq(("MIT", url("http://opensource.org/licenses/MIT")))
 
 testFrameworks += new TestFramework("utest.runner.Framework")
 
+/**
+ * see [[https://www.scala-sbt.org/1.x/docs/Using-Sonatype.html]]
+ */
+
+// Remove all additional repository other than Maven Central from POM
+pomIncludeRepository := { _ => false }
 publishMavenStyle := true
 
 Test / publishArtifact := false
 
-publishTo := sonatypePublishToBundle.value
+sonatypeCredentialHost := sonatypeCentralHost
+ThisBuild / publishTo := {
+  val centralSnapshots = "https://central.sonatype.com/repository/maven-snapshots/"
+  if (isSnapshot.value) Some("central-snapshots" at centralSnapshots)
+  else localStaging.value
+}
 
 coverageFailOnMinimum := false
 coverageMinimumStmtTotal := 70
